@@ -1,0 +1,43 @@
+name: Test Python package
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+env:
+  UV_SYSTEM_PYTHON: 1
+  # Configure a constant location for the uv cache
+  UV_CACHE_DIR: /tmp/.uv-cache
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+            uv-${{ runner.os }}
+      - name: Install dependencies
+        run: uv pip install nox[uv]
+      - name: Test with pytest
+        run: nox -db uv
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          use_oidc: true
+      - name: Minimize uv cache
+        run: uv cache prune --ci

@@ -1,0 +1,71 @@
+[build-system]
+requires = [
+    "setuptools>=61",
+    "setuptools_scm[toml]>=7",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-template"  # Please revise this line.
+dynamic = ["version"]
+description = "A Python template."  # Please revise this line.
+authors = [
+    { name = "Jinzhe Zeng", email = "jinzhe.zeng@rutgers.edu"},
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+]
+dependencies = [
+]
+requires-python = ">=3.9"
+readme = "README.md"
+keywords = [
+]
+
+[project.scripts]
+
+[project.urls]
+repository = "https://github.com/njzjz/python-template"  # Please revise this line.
+
+[project.optional-dependencies]
+test = [
+    'pytest',
+    'pytest-cov',
+]
+
+[tool.setuptools.packages.find]
+include = ["python_template*"]  # Please revise this line.
+
+[tool.setuptools_scm]
+version_file = "python_template/_version.py"  # Please revise this line.
+
+[tool.ruff.lint]
+select = [
+    "ALL",
+]
+ignore = [
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.isort]
+required-imports = [
+    "from __future__ import annotations",
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # asserts allowed in tests...
+]
+
+[tool.coverage.report]
+include = ["python_template/*"]  # Please revise this line.
