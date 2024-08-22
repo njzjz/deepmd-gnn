@@ -55,8 +55,8 @@ torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
         continue;
       }
       // add edge
-      edge_index.push_back(ii);
       edge_index.push_back(kk);
+      edge_index.push_back(ii);
     }
   }
   // convert to tensor
