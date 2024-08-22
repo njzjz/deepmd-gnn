@@ -623,29 +623,35 @@ class MaceModel(BaseModel):
                         device=extended_coord_ff.device,
                     ),
                 },
-                compute_virials=True,
+                compute_force=False,
+                compute_virials=False,
+                compute_stress=False,
+                compute_displacement=True,
                 training=self.training,
             )
-            energy = ret["energy"]
-            if energy is None:
-                msg = "energy is None"
-                raise ValueError(msg)
-            energy = energy.view(1, 1).to(extended_coord_.dtype)
-            force = ret["forces"]
-            if force is None:
-                msg = "force is None"
-                raise ValueError(msg)
-            force = force.view(1, nall, 3).to(extended_coord_.dtype)
-            virial = ret["virials"]
-            if virial is None:
-                msg = "virial is None"
-                raise ValueError(msg)
-            virial = virial.view(1, 9)
+
             atom_energy = ret["node_energy"]
             if atom_energy is None:
                 msg = "atom_energy is None"
                 raise ValueError(msg)
-            atom_energy = atom_energy.view(1, nall).to(extended_coord_.dtype)[:, :nall]
+            atom_energy = atom_energy.view(1, nall).to(extended_coord_.dtype)[:, :nloc]
+            energy = torch.sum(atom_energy, dim=1).view(1, 1).to(extended_coord_.dtype)
+            grad_outputs: list[Optional[torch.Tensor]] = [
+                torch.ones_like(energy),
+            ]
+            displacement = ret["displacement"]
+            force, virial = torch.autograd.grad(
+                outputs=[energy],
+                inputs=[extended_coord_ff, displacement],
+                grad_outputs=grad_outputs,
+                retain_graph=True,
+                create_graph=self.training,
+            )
+            force = -force
+            virial = -virial
+            force = force.view(1, nall, 3).to(extended_coord_.dtype)
+            virial = virial.view(1, 9).to(extended_coord_.dtype)
+
             energies.append(energy)
             forces.append(force)
             virials.append(virial)
@@ -654,14 +660,13 @@ class MaceModel(BaseModel):
         forces = torch.cat(forces, dim=0)
         virials = torch.cat(virials, dim=0)
         atom_energies = torch.cat(atom_energies, dim=0)
-        print(atom_energies)
 
         return {
             "energy_redu": energies.view(nf, 1),
             "energy_derv_r": forces.view(nf, nall, 1, 3),
             "energy_derv_c_redu": virials.view(nf, 1, 9),
             # take the first nloc atoms to match other models
-            "energy": atom_energies.view(nf, nall, 1)[:, :nloc, :],
+            "energy": atom_energies.view(nf, nloc, 1),
             # fake atom_virial
             "energy_derv_c": torch.zeros(
                 (nf, nall, 1, 9),
