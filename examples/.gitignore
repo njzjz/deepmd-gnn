@@ -1,0 +1,8 @@
+lcurve.out
+out.json
+input_v2_compat.json
+checkpoint
+*.pth
+*.pb
+*.pt
+model.ckpt*
