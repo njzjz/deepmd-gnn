@@ -309,12 +309,13 @@ class MaceModel(BaseModel):
             rcond=None,
             preset_bias=self.preset_out_bias,
         )
-        self.model.atomic_energies_fn.atomic_energies = (
-            bias_out["energy"]
-            .view(self.model.atomic_energies_fn.atomic_energies.shape)
-            .to(self.model.atomic_energies_fn.atomic_energies.dtype)
-            .to(self.model.atomic_energies_fn.atomic_energies.device)
-        )
+        if "energy" in bias_out:
+            self.model.atomic_energies_fn.atomic_energies = (
+                bias_out["energy"]
+                .view(self.model.atomic_energies_fn.atomic_energies.shape)
+                .to(self.model.atomic_energies_fn.atomic_energies.dtype)
+                .to(self.model.atomic_energies_fn.atomic_energies.device)
+            )
 
     @torch.jit.export
     def fitting_output_def(self) -> FittingOutputDef:
