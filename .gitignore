@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 .ruff_cache/
 node_modules/
+deepmd_mace/_version.py

@@ -50,6 +50,9 @@ test = [
 [tool.scikit-build]
 wheel.py-api = "py2.py3"
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = [
+    "/deepmd_mace/_version.py",
+]
 
 [tool.scikit-build.cmake.define]
 BUILD_PY_IF = true
