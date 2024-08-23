@@ -22,7 +22,7 @@ def mace_model_args() -> Argument:
     doc_interaction = "name of interaction block"
     doc_num_interactions = "number of interactions"
     doc_hidden_irreps = "hidden irreps"
-    doc_pair_repulsion = "use amsgrad variant of optimizer"
+    doc_pair_repulsion = "use pair repulsion term with ZBL potential"
     doc_distance_transform = "distance transform"
     doc_correlation = "correlation order at each layer"
     doc_gate = "non linearity for last readout"
