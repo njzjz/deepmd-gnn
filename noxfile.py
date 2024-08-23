@@ -15,6 +15,7 @@ def tests(session: nox.Session) -> None:
         "import torch;print(torch.utils.cmake_prefix_path)",
         silent=True,
     )
+    session.log(f"{cmake_prefix_path=}")
     session.install("-e.[test]", env={"CMAKE_PREFIX_PATH": cmake_prefix_path})
     session.run(
         "pytest",
