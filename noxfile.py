@@ -14,7 +14,7 @@ def tests(session: nox.Session) -> None:
         "-c",
         "import torch;print(torch.utils.cmake_prefix_path)",
         silent=True,
-    )
+    ).strip()
     session.log(f"{cmake_prefix_path=}")
     session.install("-e.[test]", env={"CMAKE_PREFIX_PATH": cmake_prefix_path})
     session.run(
