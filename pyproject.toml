@@ -68,12 +68,19 @@ select = [
     "ALL",
 ]
 ignore = [
+    "PLR0912",
     "PLR0913", # Too many arguments in function definition
+    "PLR0915",
+    "PLR2004",
     "FBT001",
     "FBT002",
     "N803",
     "FA100",
     "S603",
+    "ANN101",
+    "ANN102",
+    "C901",
+    "E501",
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -82,6 +89,9 @@ convention = "numpy"
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*.py" = [
     "S101", # asserts allowed in tests...
+    "ANN",
+    "D101",
+    "D102",
 ]
 
 [tool.coverage.report]

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """Wrapper for MACE models."""
 
-from typing import Any, NoReturn, Optional
+from copy import deepcopy
+from typing import Any, Optional
 
 import torch
 from deepmd.dpmodel.output_def import (
@@ -507,7 +508,7 @@ class MaceModel(BaseModel):
             model_predict["extended_virial"] = model_ret["energy_derv_c"].squeeze(-3)
         return model_predict
 
-    def forward_lower_common(  # noqa: PLR0915
+    def forward_lower_common(
         self,
         extended_coord: torch.Tensor,
         extended_atype: torch.Tensor,
@@ -560,6 +561,7 @@ class MaceModel(BaseModel):
         forces = []
         virials = []
         atom_energies = []
+        atomic_virials = []
         for ff in range(nf):
             extended_coord_ff = extended_coord[ff]
             extended_atype_ff = extended_atype[ff]
@@ -588,9 +590,10 @@ class MaceModel(BaseModel):
             one_hot = oh.view((nall, self.ntypes))
 
             # cast to float32
-            extended_coord_ff = extended_coord_ff.to(torch.float32)
-            unit_shifts = unit_shifts.to(torch.float32)
-            one_hot = one_hot.to(torch.float32)
+            default_dtype = self.model.atomic_energies_fn.atomic_energies.dtype
+            extended_coord_ff = extended_coord_ff.to(default_dtype)
+            unit_shifts = unit_shifts.to(default_dtype)
+            one_hot = one_hot.to(default_dtype)
             # it seems None is not allowed for data
             box = (
                 torch.eye(
@@ -644,32 +647,33 @@ class MaceModel(BaseModel):
             if displacement is None:
                 msg = "displacement is None"
                 raise ValueError(msg)
-            force, virial = torch.autograd.grad(
+            force = torch.autograd.grad(
                 outputs=[energy],
-                inputs=[extended_coord_ff, displacement],
+                inputs=[extended_coord_ff],
                 grad_outputs=grad_outputs,
                 retain_graph=True,
                 create_graph=self.training,
-            )
+            )[0]
             if force is None:
                 msg = "force is None"
                 raise ValueError(msg)
-            if virial is None:
-                msg = "virial is None"
-                raise ValueError(msg)
             force = -force
-            virial = -virial
+            atomic_virial = force.unsqueeze(-1) @ extended_coord_ff.unsqueeze(-2)
             force = force.view(1, nall, 3).to(extended_coord_.dtype)
-            virial = virial.view(1, 9).to(extended_coord_.dtype)
+            virial = (
+                torch.sum(atomic_virial, dim=0).view(1, 9).to(extended_coord_.dtype)
+            )
 
             energies.append(energy)
             forces.append(force)
             virials.append(virial)
             atom_energies.append(atom_energy)
+            atomic_virials.append(atomic_virial)
         energies_t = torch.cat(energies, dim=0)
         forces_t = torch.cat(forces, dim=0)
         virials_t = torch.cat(virials, dim=0)
         atom_energies_t = torch.cat(atom_energies, dim=0)
+        atomic_virials_t = torch.cat(atomic_virials, dim=0)
 
         return {
             "energy_redu": energies_t.view(nf, 1),
@@ -678,11 +682,7 @@ class MaceModel(BaseModel):
             # take the first nloc atoms to match other models
             "energy": atom_energies_t.view(nf, nloc, 1),
             # fake atom_virial
-            "energy_derv_c": torch.zeros(
-                (nf, nall, 1, 9),
-                dtype=extended_coord_.dtype,
-                device=extended_coord_.device,
-            ),
+            "energy_derv_c": atomic_virials_t.view(nf, nall, 1, 9),
         }
 
     def serialize(self) -> dict:
@@ -691,7 +691,7 @@ class MaceModel(BaseModel):
         raise NotImplementedError(msg)
 
     @classmethod
-    def deserialize(cls, data: dict) -> NoReturn:  # noqa: ARG003
+    def deserialize(cls, data: dict) -> "MaceModel":  # noqa: ARG003
         """Deserialize the model."""
         msg = "not implemented"
         raise NotImplementedError(msg)
@@ -746,3 +746,24 @@ class MaceModel(BaseModel):
     def model_output_type(self) -> list[str]:
         """Get the output type for the model."""
         return ["energy"]
+
+    def translated_output_def(self) -> dict[str, Any]:
+        """Get the translated output def for the model."""
+        out_def_data = self.model_output_def().get_data()
+        output_def = {
+            "atom_energy": deepcopy(out_def_data["energy"]),
+            "energy": deepcopy(out_def_data["energy_redu"]),
+        }
+        output_def["force"] = deepcopy(out_def_data["energy_derv_r"])
+        output_def["force"].squeeze(-2)
+        output_def["virial"] = deepcopy(out_def_data["energy_derv_c_redu"])
+        output_def["virial"].squeeze(-2)
+        output_def["atom_virial"] = deepcopy(out_def_data["energy_derv_c"])
+        output_def["atom_virial"].squeeze(-3)
+        if "mask" in out_def_data:
+            output_def["mask"] = deepcopy(out_def_data["mask"])
+        return output_def
+
+    def model_output_def(self) -> ModelOutputDef:
+        """Get the output def for the model."""
+        return ModelOutputDef(self.fitting_output_def())
