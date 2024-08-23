@@ -17,7 +17,7 @@ jobs:
       - name: Set up uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Build dist
-        run: uv tool run --with build[uv] --from build python -m build --installer uv
+        run: uv tool run --with build[uv] --from build python -m build --installer uv --sdist
       - name: Upload release distributions
         uses: actions/upload-artifact@v4
         with:
