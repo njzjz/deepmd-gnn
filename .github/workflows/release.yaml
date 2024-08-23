@@ -6,6 +6,8 @@ on:
       - "v*"
   pull_request:
 name: Build and release to pypi
+permissions:
+  contents: read
 jobs:
   release-build:
     name: Build and upload distributions
