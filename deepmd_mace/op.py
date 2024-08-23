@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """Load OP library."""
-from pathlib import Path
+
+from __future__ import annotations
+
 import platform
+from pathlib import Path
 
 import torch
 
@@ -10,7 +13,7 @@ import deepmd_mace.lib
 SHARED_LIB_DIR = Path(deepmd_mace.lib.__path__[0])
 
 
-def load_library(module_name: str) -> bool:
+def load_library(module_name: str) -> None:
     """Load OP library.
 
     Parameters

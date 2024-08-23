@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "deepmd-mace"
 dynamic = ["version"]
-description = "MACE plugin for DeePMD-kit." 
+description = "MACE plugin for DeePMD-kit."
 authors = [
     { name = "Jinzhe Zeng", email = "jinzhe.zeng@rutgers.edu"},
 ]
@@ -75,11 +75,6 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
-
-[tool.ruff.lint.isort]
-required-imports = [
-    "from __future__ import annotations",
-]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*.py" = [

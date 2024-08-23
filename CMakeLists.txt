@@ -50,12 +50,12 @@ elseif(NOT Torch_VERSION VERSION_LESS "1.5.0")
   set_if_higher(CMAKE_CXX_STANDARD 14)
 endif()
 string(REGEX MATCH "_GLIBCXX_USE_CXX11_ABI=([0-9]+)" CXXABI_PT_MATCH
-            "${TORCH_CXX_FLAGS}")
+             "${TORCH_CXX_FLAGS}")
 if(CXXABI_PT_MATCH)
   set(OP_CXX_ABI_PT ${CMAKE_MATCH_1})
   message(STATUS "PyTorch CXX11 ABI: ${CMAKE_MATCH_1}")
 else()
-# Maybe in macos/windows
+  # Maybe in macos/windows
   set(OP_CXX_ABI_PT 0)
 endif()
 

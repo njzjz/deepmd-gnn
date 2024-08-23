@@ -5,8 +5,7 @@
 
 torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
                               const torch::Tensor &atype_tensor,
-                              const torch::Tensor &mm_tensor)
-{
+                              const torch::Tensor &mm_tensor) {
   torch::Tensor nlist_tensor_ = nlist_tensor.cpu().contiguous();
   torch::Tensor atype_tensor_ = atype_tensor.cpu().contiguous();
   torch::Tensor mm_tensor_ = mm_tensor.cpu().contiguous();
@@ -21,37 +20,29 @@ torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
   std::vector<int64_t> edge_index;
   edge_index.reserve(nloc * nnei * 2);
 
-  for (int64_t ii = 0; ii < nloc; ii++)
-  {
-    for (int64_t jj = 0; jj < nnei; jj++)
-    {
+  for (int64_t ii = 0; ii < nloc; ii++) {
+    for (int64_t jj = 0; jj < nnei; jj++) {
       int64_t idx = ii * nnei + jj;
       int64_t kk = nlist[idx];
-      if (kk < 0)
-      {
+      if (kk < 0) {
         continue;
       }
       // check if both atype[ii] and atype[kk] are in mm
       bool in_mm1 = false;
-      for (int64_t mm_idx = 0; mm_idx < nmm; mm_idx++)
-      {
-        if (atype[ii] == mm[mm_idx])
-        {
+      for (int64_t mm_idx = 0; mm_idx < nmm; mm_idx++) {
+        if (atype[ii] == mm[mm_idx]) {
           in_mm1 = true;
           break;
         }
       }
       bool in_mm2 = false;
-      for (int64_t mm_idx = 0; mm_idx < nmm; mm_idx++)
-      {
-        if (atype[kk] == mm[mm_idx])
-        {
+      for (int64_t mm_idx = 0; mm_idx < nmm; mm_idx++) {
+        if (atype[kk] == mm[mm_idx]) {
           in_mm2 = true;
           break;
         }
       }
-      if (in_mm1 && in_mm2)
-      {
+      if (in_mm1 && in_mm2) {
         continue;
       }
       // add edge

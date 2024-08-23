@@ -1,6 +1,6 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Wrapper for MACE models."""
 
-# SPDX-License-Identifier: LGPL-3.0-or-later
 from typing import Any, NoReturn, Optional
 
 import torch
@@ -241,7 +241,7 @@ class MaceModel(BaseModel):
         self.ntypes = len(type_map)
         self.rcut = r_max
         atomic_numbers = []
-        self.preset_out_bias = {"energy": []}
+        self.preset_out_bias: dict[str, list] = {"energy": []}
         self.mm_types = []
         self.sel = sel
         for ii, tt in enumerate(type_map):
@@ -666,17 +666,17 @@ class MaceModel(BaseModel):
             forces.append(force)
             virials.append(virial)
             atom_energies.append(atom_energy)
-        energies = torch.cat(energies, dim=0)
-        forces = torch.cat(forces, dim=0)
-        virials = torch.cat(virials, dim=0)
-        atom_energies = torch.cat(atom_energies, dim=0)
+        energies_t = torch.cat(energies, dim=0)
+        forces_t = torch.cat(forces, dim=0)
+        virials_t = torch.cat(virials, dim=0)
+        atom_energies_t = torch.cat(atom_energies, dim=0)
 
         return {
-            "energy_redu": energies.view(nf, 1),
-            "energy_derv_r": forces.view(nf, nall, 1, 3),
-            "energy_derv_c_redu": virials.view(nf, 1, 9),
+            "energy_redu": energies_t.view(nf, 1),
+            "energy_derv_r": forces_t.view(nf, nall, 1, 3),
+            "energy_derv_c_redu": virials_t.view(nf, 1, 9),
             # take the first nloc atoms to match other models
-            "energy": atom_energies.view(nf, nloc, 1),
+            "energy": atom_energies_t.view(nf, nloc, 1),
             # fake atom_virial
             "energy_derv_c": torch.zeros(
                 (nf, nall, 1, 9),

@@ -1,7 +1,5 @@
 """Argument check for the MACE model."""
 
-from __future__ import annotations
-
 from dargs import Argument
 from deepmd.utils.argcheck import model_args_plugin
 
