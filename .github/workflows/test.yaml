@@ -9,14 +9,13 @@ on:
 env:
   UV_SYSTEM_PYTHON: 1
   # Configure a constant location for the uv cache
-  UV_CACHE_DIR: /tmp/.uv-cache
-permissions:
-  contents: read
+  UV_CACHE_DIR: /tmp/.uv-cache  
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv
