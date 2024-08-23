@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from importlib.metadata import version
 
-from python_template import __version__
+from deepmd_mace import __version__
 
 
 def test_version() -> None:
     """Test version."""
-    assert version("python-template") == __version__
+    assert version("deepmd-mace") == __version__

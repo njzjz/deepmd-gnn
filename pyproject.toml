@@ -1,14 +1,13 @@
 [build-system]
 requires = [
-    "setuptools>=61",
-    "setuptools_scm[toml]>=7",
+    "scikit-build-core>=0.3.0",
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "scikit_build_core.build"
 
 [project]
-name = "python-template"  # Please revise this line.
+name = "deepmd-mace"
 dynamic = ["version"]
-description = "A Python template."  # Please revise this line.
+description = "MACE plugin for DeePMD-kit."
 authors = [
     { name = "Jinzhe Zeng", email = "jinzhe.zeng@rutgers.edu"},
 ]
@@ -24,6 +23,10 @@ classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
 ]
 dependencies = [
+    "torch",
+    "deepmd-kit[torch]>=3.0.0b2",
+    "mace-torch>=0.3.5",
+    "e3nn",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -32,8 +35,11 @@ keywords = [
 
 [project.scripts]
 
+[project.entry-points."deepmd.pt"]
+mace = "deepmd_mace.mace:MaceModel"
+
 [project.urls]
-repository = "https://github.com/njzjz/python-template"  # Please revise this line.
+repository = "https://github.com/njzjz/deepmd_mace"
 
 [project.optional-dependencies]
 test = [
@@ -41,26 +47,34 @@ test = [
     'pytest-cov',
 ]
 
-[tool.setuptools.packages.find]
-include = ["python_template*"]  # Please revise this line.
+[tool.scikit-build]
+wheel.py-api = "py2.py3"
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = [
+    "/deepmd_mace/_version.py",
+]
+
+[tool.scikit-build.cmake.define]
+BUILD_PY_IF = true
+BUILD_CPP_IF = false
 
 [tool.setuptools_scm]
-version_file = "python_template/_version.py"  # Please revise this line.
+version_file = "deepmd_mace/_version.py"
 
 [tool.ruff.lint]
 select = [
     "ALL",
 ]
 ignore = [
+    "PLR0913", # Too many arguments in function definition
+    "FBT001",
+    "FBT002",
+    "N803",
+    "FA100",
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
-
-[tool.ruff.lint.isort]
-required-imports = [
-    "from __future__ import annotations",
-]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*.py" = [
@@ -68,4 +82,4 @@ required-imports = [
 ]
 
 [tool.coverage.report]
-include = ["python_template/*"]  # Please revise this line.
+include = ["deepmd_mace/*"]

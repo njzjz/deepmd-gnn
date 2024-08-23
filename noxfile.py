@@ -8,7 +8,15 @@ import nox
 @nox.session
 def tests(session: nox.Session) -> None:
     """Run test suite with pytest."""
-    session.install("-e.[test]")
+    session.install("numpy", "torch", "-i", "https://download.pytorch.org/whl/cpu")
+    cmake_prefix_path = session.run(
+        "python",
+        "-c",
+        "import torch;print(torch.utils.cmake_prefix_path)",
+        silent=True,
+    ).strip()
+    session.log(f"{cmake_prefix_path=}")
+    session.install("-e.[test]", env={"CMAKE_PREFIX_PATH": cmake_prefix_path})
     session.run(
         "pytest",
         "--cov",
