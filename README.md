@@ -104,5 +104,5 @@ Such MACE+DPRc model can be directly used in AmberTools24.
 
 ## Examples
 
-- [examples/water]
-- [examples/dprc]
+- [examples/water](examples/water)
+- [examples/dprc](examples/dprc)
