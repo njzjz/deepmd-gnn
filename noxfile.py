@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import nox
 
 
@@ -12,7 +10,7 @@ def tests(session: nox.Session) -> None:
     """Run test suite with pytest."""
     session.install("torch", "-i", "https://download.pytorch.org/whl/cpu")
     cmake_prefix_path = session.run(
-        sys.executable,
+        "python",
         "-c",
         "import torch;print(torch.utils.cmake_prefix_path)",
         silent=True,
