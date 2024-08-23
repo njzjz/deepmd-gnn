@@ -36,7 +36,7 @@ keywords = [
 [project.scripts]
 
 [project.entry-points."deepmd.pt"]
-mace = "deepmd_mace:MACE"
+mace = "deepmd_mace.mace:MaceModel"
 
 [project.urls]
 repository = "https://github.com/njzjz/deepmd_mace"
