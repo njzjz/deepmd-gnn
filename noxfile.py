@@ -10,7 +10,7 @@ def tests(session: nox.Session) -> None:
     """Run test suite with pytest."""
     session.install(
         "numpy",
-        "deepmd-kit[torch]",
+        "deepmd-kit[torch]>=3.0.0b2",
         "--extra-index-url",
         "https://download.pytorch.org/whl/cpu",
     )
