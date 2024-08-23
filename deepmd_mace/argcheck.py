@@ -28,6 +28,7 @@ def mace_model_args() -> Argument:
     doc_radial_type = "type of radial basis functions"
     doc_radial_mlp = "width of the radial MLP"
     doc_std = "Standard deviation of force components in the training set"
+    doc_precision = "Precision of the model, float32 or float64"
     return Argument(
         "mace",
         dict,
@@ -108,6 +109,13 @@ def mace_model_args() -> Argument:
                 doc=doc_radial_mlp,
             ),
             Argument("std", float, optional=True, doc=doc_std),
+            Argument(
+                "precision",
+                str,
+                optional=True,
+                default="float32",
+                doc=doc_precision,
+            ),
         ],
         doc="MACE model",
     )
