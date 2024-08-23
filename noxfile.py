@@ -8,7 +8,12 @@ import nox
 @nox.session
 def tests(session: nox.Session) -> None:
     """Run test suite with pytest."""
-    session.install("numpy", "torch", "-i", "https://download.pytorch.org/whl/cpu")
+    session.install(
+        "numpy",
+        "deepmd-kit[torch]>=3.0.0b2",
+        "--extra-index-url",
+        "https://download.pytorch.org/whl/cpu",
+    )
     cmake_prefix_path = session.run(
         "python",
         "-c",
