@@ -91,7 +91,8 @@ Below is default values for the MACE model, most of which follows default values
   "MLP_irreps": "16x0e",
   "radial_type": "bessel",
   "radial_MLP": [64, 64, 64],
-  "std": null
+  "std": null,
+  "precision": "float32"
 }
 ```
 
