@@ -641,6 +641,9 @@ class MaceModel(BaseModel):
                 torch.ones_like(energy),
             ]
             displacement = ret["displacement"]
+            if displacement is None:
+                msg = "displacement is None"
+                raise ValueError(msg)
             force, virial = torch.autograd.grad(
                 outputs=[energy],
                 inputs=[extended_coord_ff, displacement],
@@ -648,6 +651,12 @@ class MaceModel(BaseModel):
                 retain_graph=True,
                 create_graph=self.training,
             )
+            if force is None:
+                msg = "force is None"
+                raise ValueError(msg)
+            if virial is None:
+                msg = "virial is None"
+                raise ValueError(msg)
             force = -force
             virial = -virial
             force = force.view(1, nall, 3).to(extended_coord_.dtype)
