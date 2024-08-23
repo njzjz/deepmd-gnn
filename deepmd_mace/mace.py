@@ -658,7 +658,9 @@ class MaceModel(BaseModel):
                 msg = "force is None"
                 raise ValueError(msg)
             force = -force
-            atomic_virial = force.unsqueeze(-1) @ extended_coord_ff.unsqueeze(-2).to(
+            atomic_virial = force.unsqueeze(-1).to(
+                extended_coord_.dtype,
+            ) @ extended_coord_ff.unsqueeze(-2).to(
                 extended_coord_.dtype,
             )
             force = force.view(1, nall, 3).to(extended_coord_.dtype)
