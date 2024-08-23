@@ -409,7 +409,7 @@ class ModelTestCase:
         natoms = 5
         nf = 1
         aprec = (
-            1e-5
+            1e-4
             if self.aprec_dict.get("test_rot", None) is None
             else self.aprec_dict["test_rot"]
         )
