@@ -10,6 +10,8 @@ env:
   UV_SYSTEM_PYTHON: 1
   # Configure a constant location for the uv cache
   UV_CACHE_DIR: /tmp/.uv-cache
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
