@@ -15,13 +15,13 @@ repos:
       - id: mixed-line-ending
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.7
+    rev: v0.6.3
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.11.1"
+    rev: "v1.11.2"
     hooks:
       - id: mypy
         additional_dependencies: []
