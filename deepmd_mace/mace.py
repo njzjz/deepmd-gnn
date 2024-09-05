@@ -26,6 +26,10 @@ from deepmd.pt.utils.stat import (
 from deepmd.pt.utils.update_sel import (
     UpdateSel,
 )
+from deepmd.pt.utils.utils import (
+    to_numpy_array,
+    to_torch_tensor,
+)
 from deepmd.utils.data_system import (
     DeepmdDataSystem,
 )
@@ -239,6 +243,25 @@ class MaceModel(BaseModel):
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         super().__init__(**kwargs)
+        self.params = {
+            "type_map": type_map,
+            "sel": sel,
+            "r_max": r_max,
+            "num_radial_basis": num_radial_basis,
+            "num_cutoff_basis": num_cutoff_basis,
+            "max_ell": max_ell,
+            "interaction": interaction,
+            "num_interactions": num_interactions,
+            "hidden_irreps": hidden_irreps,
+            "pair_repulsion": pair_repulsion,
+            "distance_transform": distance_transform,
+            "correlation": correlation,
+            "gate": gate,
+            "MLP_irreps": MLP_irreps,
+            "radial_type": radial_type,
+            "radial_MLP": radial_MLP,
+            "std": std,
+        }
         self.type_map = type_map
         self.ntypes = len(type_map)
         self.rcut = r_max
@@ -692,14 +715,33 @@ class MaceModel(BaseModel):
 
     def serialize(self) -> dict:
         """Serialize the model."""
-        msg = "not implemented"
-        raise NotImplementedError(msg)
+        return {
+            "@class": "Model",
+            "@version": 1,
+            "type": "mace",
+            **self.params,
+            "@variables": {
+                kk: to_numpy_array(vv) for kk, vv in self.model.state_dict().items()
+            },
+        }
 
     @classmethod
-    def deserialize(cls, data: dict) -> "MaceModel":  # noqa: ARG003
+    def deserialize(cls, data: dict) -> "MaceModel":
         """Deserialize the model."""
-        msg = "not implemented"
-        raise NotImplementedError(msg)
+        data = data.copy()
+        if not (
+            data.pop("@class") == "Model"
+            and data.pop("@version") == 1
+            and data.pop("type") == "mace"
+        ):
+            msg = "data is not a serialized MaceModel"
+            raise ValueError(msg)
+        variables = {
+            kk: to_torch_tensor(vv) for kk, vv in data.pop("@variables").items()
+        }
+        model = cls(**data)
+        model.model.load_state_dict(variables)
+        return model
 
     @torch.jit.export
     def get_nnei(self) -> int:
