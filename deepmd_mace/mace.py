@@ -36,6 +36,9 @@ from deepmd.utils.data_system import (
 from deepmd.utils.path import (
     DPPath,
 )
+from deepmd.utils.version import (
+    check_version_compatibility,
+)
 from e3nn import (
     o3,
 )
@@ -729,13 +732,10 @@ class MaceModel(BaseModel):
     def deserialize(cls, data: dict) -> "MaceModel":
         """Deserialize the model."""
         data = data.copy()
-        if not (
-            data.pop("@class") == "Model"
-            and data.pop("@version") == 1
-            and data.pop("type") == "mace"
-        ):
+        if not (data.pop("@class") == "Model" and data.pop("type") == "mace"):
             msg = "data is not a serialized MaceModel"
             raise ValueError(msg)
+        check_version_compatibility(data.pop("@version"), 1, 1)
         variables = {
             kk: to_torch_tensor(vv) for kk, vv in data.pop("@variables").items()
         }
