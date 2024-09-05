@@ -51,8 +51,7 @@ class PTTestCase:
         """Modules to test."""
         return [
             self.module,
-            # unsupported - we cannot do it for the whole mace
-            # self.deserialized_module,
+            self.deserialized_module,
         ]
 
     def test_jit(self) -> None:
