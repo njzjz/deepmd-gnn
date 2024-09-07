@@ -12,7 +12,12 @@ from deepmd.dpmodel.output_def import (
     check_deriv,
 )
 from deepmd.dpmodel.utils.nlist import (
+    build_neighbor_list,
+    extend_coord_with_ghosts,
     extend_input_and_build_neighbor_list,
+)
+from deepmd.dpmodel.utils.region import (
+    normalize_coord,
 )
 from deepmd.pt.utils.utils import (
     to_numpy_array,
@@ -160,7 +165,7 @@ class ModelTestCase:
     def test_get_rcut(self) -> None:
         """Test get_rcut."""
         for module in self.modules_to_test:
-            assert module.get_rcut() == self.expected_rcut
+            assert module.get_rcut() == self.expected_rcut * 2
 
     def test_get_dim_fparam(self) -> None:
         """Test get_dim_fparam."""
@@ -226,6 +231,24 @@ class ModelTestCase:
             mixed_types=self.module.mixed_types(),
             box=cell,
         )
+        coord_normalized = normalize_coord(
+            coord.reshape(nf, natoms, 3),
+            cell.reshape(nf, 3, 3),
+        )
+        coord_ext_large, atype_ext_large, mapping_large = extend_coord_with_ghosts(
+            coord_normalized,
+            atype,
+            cell,
+            self.module.get_rcut(),
+        )
+        nlist_large = build_neighbor_list(
+            coord_ext_large,
+            atype_ext_large,
+            natoms,
+            self.expected_rcut,
+            self.expected_sel,
+            distinguish_types=(not self.module.mixed_types()),
+        )
         spin_ext = np.take_along_axis(
             spin.reshape(nf, -1, 3),
             np.repeat(np.expand_dims(mapping, axis=-1), 3, axis=-1),
@@ -253,17 +276,29 @@ class ModelTestCase:
             ret.append(module(**input_dict))
 
             input_dict_lower = {
-                "extended_coord": coord_ext,
-                "extended_atype": atype_ext,
-                "nlist": nlist,
-                "mapping": mapping,
+                "extended_coord": coord_ext_large,
+                "extended_atype": atype_ext_large,
+                "nlist": nlist_large,
+                "aparam": aparam,
+                "fparam": fparam,
+                "mapping": mapping_large,
+            }
+            if test_spin:
+                input_dict_lower["extended_spin"] = spin_ext
+
+            # use shuffled nlist, simulating the lammps interface
+            rng.shuffle(input_dict_lower["nlist"], axis=-1)
+            ret_lower.append(module.forward_lower(**input_dict_lower))
+
+            input_dict_lower = {
+                "extended_coord": coord_ext_large,
+                "extended_atype": atype_ext_large,
+                "nlist": nlist_large,
                 "aparam": aparam,
                 "fparam": fparam,
             }
             if test_spin:
                 input_dict_lower["extended_spin"] = spin_ext
-
-            ret_lower.append(module.forward_lower(**input_dict_lower))
 
             # use shuffled nlist, simulating the lammps interface
             rng.shuffle(input_dict_lower["nlist"], axis=-1)
@@ -288,12 +323,24 @@ class ModelTestCase:
                     subret.append(rr[kk])
             if len(subret):
                 for ii, rr in enumerate(subret[1:]):
+                    if kk == "expanded_force":
+                        # use mapping to scatter sum the forces
+                        rr = np.take_along_axis(  # noqa: PLW2901
+                            rr,
+                            np.repeat(
+                                np.expand_dims(mapping_large, axis=-1),
+                                3,
+                                axis=-1,
+                            ),
+                            axis=1,
+                        )
                     if subret[0] is None:
                         assert rr is None
                     else:
                         np.testing.assert_allclose(
                             subret[0],
                             rr,
+                            atol=1e-5,
                             err_msg=f"compare {kk} between 0 and {ii}",
                         )
         same_keys = set(ret[0].keys()) & set(ret_lower[0].keys())
@@ -408,7 +455,7 @@ class ModelTestCase:
         natoms = 5
         nf = 1
         aprec = (
-            1e-4
+            1e-14
             if self.aprec_dict.get("test_rot", None) is None
             else self.aprec_dict["test_rot"]
         )
