@@ -18,6 +18,7 @@ from deepmd.pt.model.model.transform_output import (
     communicate_extended_output,
 )
 from deepmd.pt.utils.nlist import (
+    build_neighbor_list,
     extend_input_and_build_neighbor_list,
 )
 from deepmd.pt.utils.stat import (
@@ -190,6 +191,8 @@ class MaceModel(BaseModel):
     ----------
     type_map : list[str]
         The name of each type of atoms
+    sel : int
+        Maximum number of neighbor atoms
     r_max : float, optional
         distance cutoff (in Ang)
     num_radial_basis : int, optional
@@ -268,6 +271,7 @@ class MaceModel(BaseModel):
         self.type_map = type_map
         self.ntypes = len(type_map)
         self.rcut = r_max
+        self.num_interactions = num_interactions
         atomic_numbers = []
         self.preset_out_bias: dict[str, list] = {"energy": []}
         self.mm_types = []
@@ -363,7 +367,7 @@ class MaceModel(BaseModel):
     @torch.jit.export
     def get_rcut(self) -> float:
         """Get the cut-off radius."""
-        return self.rcut
+        return self.rcut * self.num_interactions
 
     @torch.jit.export
     def get_type_map(self) -> list[str]:
@@ -448,6 +452,7 @@ class MaceModel(BaseModel):
         do_atomic_virial : bool, optional
             Whether to compute atomic virial.
         """
+        nloc = atype.shape[1]
         extended_coord, extended_atype, mapping, nlist = (
             extend_input_and_build_neighbor_list(
                 coord,
@@ -459,10 +464,11 @@ class MaceModel(BaseModel):
             )
         )
         model_ret_lower = self.forward_lower_common(
+            nloc,
             extended_coord,
             extended_atype,
             nlist,
-            mapping=None,
+            mapping=mapping,
             fparam=fparam,
             aparam=aparam,
             do_atomic_virial=do_atomic_virial,
@@ -516,7 +522,21 @@ class MaceModel(BaseModel):
         comm_dict : dict[str, torch.Tensor], optional
             The communication dictionary.
         """
+        nloc = nlist.shape[1]
+        nf, nall = extended_atype.shape
+        # calculate nlist for ghost atoms, as LAMMPS does not calculate it
+        if mapping is None and self.num_interactions > 1 and nloc < nall:
+            nlist = build_neighbor_list(
+                extended_coord.view(nf, -1),
+                extended_atype,
+                nall,
+                self.rcut,
+                self.sel,
+                distinguish_types=False,
+            )
+
         model_ret = self.forward_lower_common(
+            nloc,
             extended_coord,
             extended_atype,
             nlist,
@@ -537,10 +557,11 @@ class MaceModel(BaseModel):
 
     def forward_lower_common(
         self,
+        nloc: int,
         extended_coord: torch.Tensor,
         extended_atype: torch.Tensor,
         nlist: torch.Tensor,
-        mapping: Optional[torch.Tensor] = None,  # noqa: ARG002
+        mapping: Optional[torch.Tensor] = None,
         fparam: Optional[torch.Tensor] = None,
         aparam: Optional[torch.Tensor] = None,
         do_atomic_virial: bool = False,  # noqa: ARG002
@@ -567,9 +588,9 @@ class MaceModel(BaseModel):
         comm_dict : dict[str, torch.Tensor], optional
             The communication dictionary.
         """
+        nf, nall = extended_atype.shape
+        extended_coord = extended_coord.view(nf, nall, 3)
         extended_coord_ = extended_coord
-        nf, nall, _ = extended_coord_.shape
-        _, nloc, _ = nlist.shape
         if fparam is not None:
             msg = "fparam is unsupported"
             raise ValueError(msg)
@@ -599,12 +620,6 @@ class MaceModel(BaseModel):
                 torch.tensor(self.mm_types, dtype=torch.int64, device="cpu"),
             )
             edge_index = edge_index.T
-            nedge = edge_index.shape[1]
-            unit_shifts = torch.zeros(
-                (nedge, 3),
-                dtype=torch.float64,
-                device=extended_coord_.device,
-            )
             # to one hot
             indices = extended_atype_ff.unsqueeze(-1)
             oh = torch.zeros(
@@ -619,7 +634,20 @@ class MaceModel(BaseModel):
             # cast to float32
             default_dtype = self.model.atomic_energies_fn.atomic_energies.dtype
             extended_coord_ff = extended_coord_ff.to(default_dtype)
-            unit_shifts = unit_shifts.to(default_dtype)
+            extended_coord_ff.requires_grad_(True)  # noqa: FBT003
+            nedge = edge_index.shape[1]
+            if self.num_interactions > 1 and mapping is not None and nloc < nall:
+                # shift the edges for ghost atoms, and map the ghost atoms to real atoms
+                shifts_atoms = extended_coord_ff - extended_coord_ff[mapping[ff]]
+                shifts = shifts_atoms[edge_index[1]] - shifts_atoms[edge_index[0]]
+                edge_index = mapping[ff][edge_index]
+            else:
+                shifts = torch.zeros(
+                    (nedge, 3),
+                    dtype=torch.float64,
+                    device=extended_coord_.device,
+                )
+            shifts = shifts.to(default_dtype)
             one_hot = one_hot.to(default_dtype)
             # it seems None is not allowed for data
             box = (
@@ -634,7 +662,7 @@ class MaceModel(BaseModel):
             ret = self.model.forward(
                 {
                     "positions": extended_coord_ff,
-                    "unit_shifts": unit_shifts,
+                    "shifts": shifts,
                     "cell": box,
                     "edge_index": edge_index,
                     "batch": torch.zeros(
@@ -657,7 +685,7 @@ class MaceModel(BaseModel):
                 compute_force=False,
                 compute_virials=False,
                 compute_stress=False,
-                compute_displacement=True,
+                compute_displacement=False,
                 training=self.training,
             )
 
@@ -670,10 +698,6 @@ class MaceModel(BaseModel):
             grad_outputs: list[Optional[torch.Tensor]] = [
                 torch.ones_like(energy),
             ]
-            displacement = ret["displacement"]
-            if displacement is None:
-                msg = "displacement is None"
-                raise ValueError(msg)
             force = torch.autograd.grad(
                 outputs=[energy],
                 inputs=[extended_coord_ff],
