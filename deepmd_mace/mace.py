@@ -718,7 +718,7 @@ class MaceModel(BaseModel):
             if do_atomic_virial:
                 extended_virial_corr = atomic_virial_corr(
                     extended_coord_ff.unsqueeze(0),
-                    atom_energy,
+                    atom_energy.view(1, nloc, 1),
                 )
                 atomic_virial = atomic_virial + extended_virial_corr
             force = force.view(1, nall, 3).to(extended_coord_.dtype)
