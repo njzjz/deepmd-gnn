@@ -15,6 +15,7 @@ from deepmd.pt.model.model.model import (
     BaseModel,
 )
 from deepmd.pt.model.model.transform_output import (
+    atomic_virial_corr,
     communicate_extended_output,
 )
 from deepmd.pt.utils.nlist import (
@@ -564,7 +565,7 @@ class MaceModel(BaseModel):
         mapping: Optional[torch.Tensor] = None,
         fparam: Optional[torch.Tensor] = None,
         aparam: Optional[torch.Tensor] = None,
-        do_atomic_virial: bool = False,  # noqa: ARG002
+        do_atomic_virial: bool = False,
         comm_dict: Optional[dict[str, torch.Tensor]] = None,
     ) -> dict[str, torch.Tensor]:
         """Forward lower common pass of the model.
@@ -714,6 +715,12 @@ class MaceModel(BaseModel):
             ) @ extended_coord_ff.unsqueeze(-2).to(
                 extended_coord_.dtype,
             )
+            if do_atomic_virial:
+                extended_virial_corr = atomic_virial_corr(
+                    extended_coord_ff.unsqueeze(0),
+                    atom_energy,
+                )
+                atomic_virial = atomic_virial + extended_virial_corr
             force = force.view(1, nall, 3).to(extended_coord_.dtype)
             virial = (
                 torch.sum(atomic_virial, dim=0).view(1, 9).to(extended_coord_.dtype)
