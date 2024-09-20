@@ -245,7 +245,7 @@ class MaceModel(BaseModel):
         MLP_irreps: str = "16x0e",
         radial_type: str = "bessel",
         radial_MLP: list[int] = [64, 64, 64],  # noqa: B006
-        std: Optional[float] = 1,
+        std: float = 1,
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         super().__init__(**kwargs)

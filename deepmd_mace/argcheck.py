@@ -108,7 +108,7 @@ def mace_model_args() -> Argument:
                 default=[64, 64, 64],
                 doc=doc_radial_mlp,
             ),
-            Argument("std", float, optional=True, doc=doc_std),
+            Argument("std", float, optional=True, doc=doc_std, default=1),
             Argument(
                 "precision",
                 str,
