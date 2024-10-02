@@ -38,6 +38,7 @@ keywords = [
 
 [project.entry-points."deepmd.pt"]
 mace = "deepmd_mace.mace:MaceModel"
+nequip = "deepmd_mace.nequip:NequipModel"
 
 [project.urls]
 repository = "https://github.com/njzjz/deepmd_mace"

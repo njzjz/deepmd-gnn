@@ -119,3 +119,156 @@ def mace_model_args() -> Argument:
         ],
         doc="MACE model",
     )
+
+
+@model_args_plugin.register("nequip")
+def nequip_model_args() -> Argument:
+    """Arguments for the NequIP model."""
+    doc_sel = "Maximum number of neighbor atoms."
+    doc_r_max = "distance cutoff (in Ang)"
+    doc_num_layers = "number of interaction blocks, we find 3-5 to work best"
+    doc_l_max = "the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower"
+    doc_num_features = "the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower"
+    doc_nonlinearity_type = "may be 'gate' or 'norm', 'gate' is recommended"
+    doc_parity = "whether to include features with odd mirror parityy; often turning parity off gives equally good results but faster networks, so do consider this"
+    doc_num_basis = (
+        "number of basis functions used in the radial basis, 8 usually works best"
+    )
+    doc_besselbasis_trainable = "set true to train the bessel weights"
+    doc_polynomialcutoff_p = "p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance"
+    doc_invariant_layers = (
+        "number of radial layers, usually 1-3 works best, smaller is faster"
+    )
+    doc_invariant_neurons = (
+        "number of hidden neurons in radial function, smaller is faster"
+    )
+    doc_use_sc = "use self-connection or not, usually gives big improvement"
+    doc_irreps_edge_sh = "irreps for the chemical embedding of species"
+    doc_feature_irreps_hidden = "irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster"
+    doc_chemical_embedding_irreps_out = "irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer"
+    doc_conv_to_output_hidden_irreps_out = "irreps used in hidden layer of output block"
+    return Argument(
+        "nequip",
+        dict,
+        [
+            Argument(
+                "sel",
+                [int, str],
+                optional=False,
+                doc=doc_sel,
+            ),
+            Argument(
+                "r_max",
+                float,
+                optional=True,
+                default=6.0,
+                doc=doc_r_max,
+            ),
+            Argument(
+                "num_layers",
+                int,
+                optional=True,
+                default=4,
+                doc=doc_num_layers,
+            ),
+            Argument(
+                "l_max",
+                int,
+                optional=True,
+                default=2,
+                doc=doc_l_max,
+            ),
+            Argument(
+                "num_features",
+                int,
+                optional=True,
+                default=32,
+                doc=doc_num_features,
+            ),
+            Argument(
+                "nonlinearity_type",
+                str,
+                optional=True,
+                default="gate",
+                doc=doc_nonlinearity_type,
+            ),
+            Argument(
+                "parity",
+                bool,
+                optional=True,
+                default=True,
+                doc=doc_parity,
+            ),
+            Argument(
+                "num_basis",
+                int,
+                optional=True,
+                default=8,
+                doc=doc_num_basis,
+            ),
+            Argument(
+                "BesselBasis_trainable",
+                bool,
+                optional=True,
+                default=True,
+                doc=doc_besselbasis_trainable,
+            ),
+            Argument(
+                "PolynomialCutoff_p",
+                int,
+                optional=True,
+                default=6,
+                doc=doc_polynomialcutoff_p,
+            ),
+            Argument(
+                "invariant_layers",
+                int,
+                optional=True,
+                default=2,
+                doc=doc_invariant_layers,
+            ),
+            Argument(
+                "invariant_neurons",
+                int,
+                optional=True,
+                default=64,
+                doc=doc_invariant_neurons,
+            ),
+            Argument(
+                "use_sc",
+                bool,
+                optional=True,
+                default=True,
+                doc=doc_use_sc,
+            ),
+            Argument(
+                "irreps_edge_sh",
+                str,
+                optional=True,
+                default="0e + 1e",
+                doc=doc_irreps_edge_sh,
+            ),
+            Argument(
+                "feature_irreps_hidden",
+                str,
+                optional=True,
+                default="32x0o + 32x0e + 32x1o + 32x1e",
+                doc=doc_feature_irreps_hidden,
+            ),
+            Argument(
+                "chemical_embedding_irreps_out",
+                str,
+                optional=True,
+                default="32x0e",
+                doc=doc_chemical_embedding_irreps_out,
+            ),
+            Argument(
+                "conv_to_output_hidden_irreps_out",
+                str,
+                optional=True,
+                default="16x0e",
+                doc=doc_conv_to_output_hidden_irreps_out,
+            ),
+        ],
+        doc="Nequip model",
+    )
