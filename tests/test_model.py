@@ -25,6 +25,7 @@ from deepmd.pt.utils.utils import (
 )
 
 from deepmd_mace.mace import MaceModel
+from deepmd_mace.nequip import NequipModel
 
 GLOBAL_SEED = 20240822
 
@@ -141,6 +142,8 @@ class ModelTestCase:
     """Expected number of neighbors."""
     expected_has_message_passing: bool
     """Expected whether having message passing."""
+    expected_nmpnn: int
+    """Expected number of MPNN."""
     forward_wrapper: ClassVar[Callable[[Any, bool], Any]]
     """Class wrapper for forward method."""
     forward_wrapper_cpu_ref: Callable[[Any], Any]
@@ -165,7 +168,7 @@ class ModelTestCase:
     def test_get_rcut(self) -> None:
         """Test get_rcut."""
         for module in self.modules_to_test:
-            assert module.get_rcut() == self.expected_rcut * 2
+            assert module.get_rcut() == self.expected_rcut * self.expected_nmpnn
 
     def test_get_dim_fparam(self) -> None:
         """Test get_dim_fparam."""
@@ -1070,3 +1073,44 @@ class TestMaceModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: igno
         cls.expected_sel_type = []
         cls.expected_dim_fparam = 0
         cls.expected_dim_aparam = 0
+        cls.expected_nmpnn = 2
+
+
+class TestNequipModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: ignore[misc]
+    """Test Nequip model."""
+
+    @property
+    def modules_to_test(self) -> list[torch.nn.Module]:  # type: ignore[override]
+        """Modules to test."""
+        skip_test_jit = getattr(self, "skip_test_jit", False)
+        modules = PTTestCase.modules_to_test.fget(self)  # type: ignore[attr-defined]
+        if not skip_test_jit:
+            # for Model, we can test script module API
+            modules += [
+                self._script_module
+                if hasattr(self, "_script_module")
+                else self.script_module,
+            ]
+        return modules
+
+    _script_module: torch.jit.ScriptModule
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Set up class."""
+        EnerModelTest.setUpClass()
+
+        cls.module = NequipModel(
+            type_map=cls.expected_type_map,
+            sel=138,
+            r_max=cls.expected_rcut,
+            num_layers=2,
+        )
+        with torch.jit.optimized_execution(should_optimize=False):
+            cls._script_module = torch.jit.script(cls.module)
+        cls.output_def = cls.module.translated_output_def()
+        cls.expected_has_message_passing = False
+        cls.expected_sel_type = []
+        cls.expected_dim_fparam = 0
+        cls.expected_dim_aparam = 0
+        cls.expected_nmpnn = 2
