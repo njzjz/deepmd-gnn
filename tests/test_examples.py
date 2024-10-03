@@ -14,6 +14,8 @@ example_path = Path(__file__).parent.parent / "examples"
 examples = (
     example_path / "water" / "mace" / "input.json",
     example_path / "dprc" / "mace" / "input.json",
+    example_path / "water" / "nequip" / "input.json",
+    example_path / "dprc" / "nequip" / "input.json",
 )
 
 
