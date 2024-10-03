@@ -58,4 +58,6 @@ torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
   return edge_index_tensor.to(nlist_tensor.device());
 }
 
+TORCH_LIBRARY(deepmd_gnn, m) { m.def("mace_edge_index", mace_edge_index); }
+// compatbility with old models freezed by deepmd_mace package
 TORCH_LIBRARY(deepmd_mace, m) { m.def("mace_edge_index", mace_edge_index); }

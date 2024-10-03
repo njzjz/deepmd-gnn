@@ -8,9 +8,9 @@ from pathlib import Path
 
 import torch
 
-import deepmd_mace.lib
+import deepmd_gnn.lib
 
-SHARED_LIB_DIR = Path(deepmd_mace.lib.__path__[0])
+SHARED_LIB_DIR = Path(deepmd_gnn.lib.__path__[0])
 
 
 def load_library(module_name: str) -> None:
@@ -38,4 +38,4 @@ def load_library(module_name: str) -> None:
     torch.ops.load_library(module_file)
 
 
-load_library("deepmd_mace")
+load_library("deepmd_gnn")
