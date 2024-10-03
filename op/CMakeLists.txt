@@ -1,4 +1,4 @@
-file(GLOB OP_SRC mace.cc)
+file(GLOB OP_SRC edge_index.cc)
 
 add_library(deepmd_gnn MODULE ${OP_SRC})
 # link: libdeepmd libtorch

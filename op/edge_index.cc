@@ -3,9 +3,9 @@
 
 #include <iostream>
 
-torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
-                              const torch::Tensor &atype_tensor,
-                              const torch::Tensor &mm_tensor) {
+torch::Tensor edge_index(const torch::Tensor &nlist_tensor,
+                         const torch::Tensor &atype_tensor,
+                         const torch::Tensor &mm_tensor) {
   torch::Tensor nlist_tensor_ = nlist_tensor.cpu().contiguous();
   torch::Tensor atype_tensor_ = atype_tensor.cpu().contiguous();
   torch::Tensor mm_tensor_ = mm_tensor.cpu().contiguous();
@@ -58,6 +58,6 @@ torch::Tensor mace_edge_index(const torch::Tensor &nlist_tensor,
   return edge_index_tensor.to(nlist_tensor.device());
 }
 
-TORCH_LIBRARY(deepmd_gnn, m) { m.def("mace_edge_index", mace_edge_index); }
+TORCH_LIBRARY(deepmd_gnn, m) { m.def("edge_index", edge_index); }
 // compatbility with old models freezed by deepmd_mace package
-TORCH_LIBRARY(deepmd_mace, m) { m.def("mace_edge_index", mace_edge_index); }
+TORCH_LIBRARY(deepmd_mace, m) { m.def("mace_edge_index", edge_index); }
