@@ -1065,6 +1065,7 @@ class TestMaceModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: igno
         cls.module = MaceModel(
             type_map=cls.expected_type_map,
             sel=138,
+            precision="float64",
         )
         with torch.jit.optimized_execution(should_optimize=False):
             cls._script_module = torch.jit.script(cls.module)
@@ -1105,6 +1106,7 @@ class TestNequipModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: ig
             sel=138,
             r_max=cls.expected_rcut,
             num_layers=2,
+            precision="float64",
         )
         with torch.jit.optimized_execution(should_optimize=False):
             cls._script_module = torch.jit.script(cls.module)
