@@ -1,6 +1,5 @@
 """Nequip model."""
 
-import json
 from copy import deepcopy
 from typing import Any, Optional
 
@@ -118,6 +117,7 @@ class NequipModel(BaseModel):
         feature_irreps_hidden: str = "32x0o + 32x0e + 32x1o + 32x1e",
         chemical_embedding_irreps_out: str = "32x0e",
         conv_to_output_hidden_irreps_out: str = "16x0e",
+        precision: str = "float32",
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         super().__init__(**kwargs)
@@ -140,6 +140,7 @@ class NequipModel(BaseModel):
             "feature_irreps_hidden": feature_irreps_hidden,
             "chemical_embedding_irreps_out": chemical_embedding_irreps_out,
             "conv_to_output_hidden_irreps_out": conv_to_output_hidden_irreps_out,
+            "precision": precision,
         }
         self.type_map = type_map
         self.ntypes = len(type_map)
@@ -178,6 +179,7 @@ class NequipModel(BaseModel):
                     "feature_irreps_hidden": feature_irreps_hidden,
                     "chemical_embedding_irreps_out": chemical_embedding_irreps_out,
                     "conv_to_output_hidden_irreps_out": conv_to_output_hidden_irreps_out,
+                    "model_dtype": precision,
                 },
             ),
         )
@@ -694,32 +696,3 @@ class NequipModel(BaseModel):
     def model_output_def(self) -> ModelOutputDef:
         """Get the output def for the model."""
         return ModelOutputDef(self.fitting_output_def())
-
-    @classmethod
-    def get_model(cls, model_params: dict) -> "NequipModel":
-        """Get the model by the parameters.
-
-        Parameters
-        ----------
-        model_params : dict
-            The model parameters
-
-        Returns
-        -------
-        BaseBaseModel
-            The model
-        """
-        model_params_old = model_params.copy()
-        model_params = model_params.copy()
-        model_params.pop("type", None)
-        precision = model_params.pop("precision", "float32")
-        if precision == "float32":
-            torch.set_default_dtype(torch.float32)
-        elif precision == "float64":
-            torch.set_default_dtype(torch.float64)
-        else:
-            msg = f"precision {precision} not supported"
-            raise ValueError(msg)
-        model = cls(**model_params)
-        model.model_def_script = json.dumps(model_params_old)
-        return model

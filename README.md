@@ -128,7 +128,8 @@ Below is default values for the MACE model, most of which follows default values
   "irreps_edge_sh": "0e + 1e",
   "feature_irreps_hidden": "32x0o + 32x0e + 32x1o + 32x1e",
   "chemical_embedding_irreps_out": "32x0e",
-  "conv_to_output_hidden_irreps_out": "16x0e"
+  "conv_to_output_hidden_irreps_out": "16x0e",
+  "precision": "float32"
 }
 ```
 
