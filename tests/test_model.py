@@ -23,7 +23,6 @@ from deepmd.pt.utils.utils import (
     to_numpy_array,
     to_torch_tensor,
 )
-
 from deepmd_mace.mace import MaceModel
 from deepmd_mace.nequip import NequipModel
 
