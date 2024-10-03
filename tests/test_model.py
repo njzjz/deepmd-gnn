@@ -24,8 +24,8 @@ from deepmd.pt.utils.utils import (
     to_torch_tensor,
 )
 
-from deepmd_mace.mace import MaceModel
-from deepmd_mace.nequip import NequipModel
+from deepmd_gnn.mace import MaceModel
+from deepmd_gnn.nequip import NequipModel
 
 GLOBAL_SEED = 20240822
 

@@ -5,9 +5,9 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "deepmd-mace"
+name = "deepmd-gnn"
 dynamic = ["version"]
-description = "MACE plugin for DeePMD-kit."
+description = "DeePMD-kit plugin for graph neural network models."
 authors = [
     { name = "Jinzhe Zeng", email = "jinzhe.zeng@rutgers.edu"},
 ]
@@ -38,11 +38,11 @@ keywords = [
 [project.scripts]
 
 [project.entry-points."deepmd.pt"]
-mace = "deepmd_mace.mace:MaceModel"
-nequip = "deepmd_mace.nequip:NequipModel"
+mace = "deepmd_gnn.mace:MaceModel"
+nequip = "deepmd_gnn.nequip:NequipModel"
 
 [project.urls]
-repository = "https://github.com/njzjz/deepmd_mace"
+repository = "https://github.com/njzjz/deepmd-gnn"
 
 [project.optional-dependencies]
 test = [
@@ -55,7 +55,7 @@ test = [
 wheel.py-api = "py2.py3"
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 sdist.include = [
-    "/deepmd_mace/_version.py",
+    "/deepmd_gnn/_version.py",
 ]
 
 [tool.scikit-build.cmake.define]
@@ -63,7 +63,7 @@ BUILD_PY_IF = true
 BUILD_CPP_IF = false
 
 [tool.setuptools_scm]
-version_file = "deepmd_mace/_version.py"
+version_file = "deepmd_gnn/_version.py"
 
 [tool.ruff.lint]
 select = [
@@ -97,4 +97,4 @@ convention = "numpy"
 ]
 
 [tool.coverage.report]
-include = ["deepmd_mace/*"]
+include = ["deepmd_gnn/*"]

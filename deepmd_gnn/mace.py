@@ -1,4 +1,5 @@
-"""Nequip model."""
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""Wrapper for MACE models."""
 
 import json
 from copy import deepcopy
@@ -16,15 +17,9 @@ from deepmd.pt.model.model.model import (
 from deepmd.pt.model.model.transform_output import (
     communicate_extended_output,
 )
-from deepmd.pt.utils import (
-    env,
-)
 from deepmd.pt.utils.nlist import (
     build_neighbor_list,
     extend_input_and_build_neighbor_list,
-)
-from deepmd.pt.utils.region import (
-    phys2inter,
 )
 from deepmd.pt.utils.stat import (
     compute_output_stats,
@@ -45,15 +40,152 @@ from deepmd.utils.path import (
 from deepmd.utils.version import (
     check_version_compatibility,
 )
+from e3nn import (
+    o3,
+)
 from e3nn.util.jit import (
     script,
 )
-from nequip.model import model_from_config
+from mace.modules import (
+    ScaleShiftMACE,
+    gate_dict,
+    interaction_classes,
+)
+
+import deepmd_gnn.op  # noqa: F401
+
+ELEMENTS = [
+    "H",
+    "He",
+    "Li",
+    "Be",
+    "B",
+    "C",
+    "N",
+    "O",
+    "F",
+    "Ne",
+    "Na",
+    "Mg",
+    "Al",
+    "Si",
+    "P",
+    "S",
+    "Cl",
+    "Ar",
+    "K",
+    "Ca",
+    "Sc",
+    "Ti",
+    "V",
+    "Cr",
+    "Mn",
+    "Fe",
+    "Co",
+    "Ni",
+    "Cu",
+    "Zn",
+    "Ga",
+    "Ge",
+    "As",
+    "Se",
+    "Br",
+    "Kr",
+    "Rb",
+    "Sr",
+    "Y",
+    "Zr",
+    "Nb",
+    "Mo",
+    "Tc",
+    "Ru",
+    "Rh",
+    "Pd",
+    "Ag",
+    "Cd",
+    "In",
+    "Sn",
+    "Sb",
+    "Te",
+    "I",
+    "Xe",
+    "Cs",
+    "Ba",
+    "La",
+    "Ce",
+    "Pr",
+    "Nd",
+    "Pm",
+    "Sm",
+    "Eu",
+    "Gd",
+    "Tb",
+    "Dy",
+    "Ho",
+    "Er",
+    "Tm",
+    "Yb",
+    "Lu",
+    "Hf",
+    "Ta",
+    "W",
+    "Re",
+    "Os",
+    "Ir",
+    "Pt",
+    "Au",
+    "Hg",
+    "Tl",
+    "Pb",
+    "Bi",
+    "Po",
+    "At",
+    "Rn",
+    "Fr",
+    "Ra",
+    "Ac",
+    "Th",
+    "Pa",
+    "U",
+    "Np",
+    "Pu",
+    "Am",
+    "Cm",
+    "Bk",
+    "Cf",
+    "Es",
+    "Fm",
+    "Md",
+    "No",
+    "Lr",
+    "Rf",
+    "Db",
+    "Sg",
+    "Bh",
+    "Hs",
+    "Mt",
+    "Ds",
+    "Rg",
+    "Cn",
+    "Nh",
+    "Fl",
+    "Mc",
+    "Lv",
+    "Ts",
+    "Og",
+]
+
+PeriodicTable = {
+    **{ee: ii for ii, ee in enumerate(ELEMENTS)},
+    **{f"m{ee}": ii for ii, ee in enumerate(ELEMENTS)},
+    "HW": 1,
+    "OW": 8,
+}
 
 
-@BaseModel.register("nequip")
-class NequipModel(BaseModel):
-    """Nequip model.
+@BaseModel.register("mace")
+class MaceModel(BaseModel):
+    """Mace model.
 
     Parameters
     ----------
@@ -63,61 +195,57 @@ class NequipModel(BaseModel):
         Maximum number of neighbor atoms
     r_max : float, optional
         distance cutoff (in Ang)
-    num_layers : int
-        number of interaction blocks, we find 3-5 to work best
-    l_max : int
-        the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
-    num_features : int
-        the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
-    nonlinearity_type : str
-        may be 'gate' or 'norm', 'gate' is recommended
-    parity : bool
-        whether to include features with odd mirror parityy; often turning parity off gives equally good results but faster networks, so do consider this
-    num_basis : int
-        number of basis functions used in the radial basis, 8 usually works best
-    BesselBasis_trainable : bool
-        set true to train the bessel weights
-    PolynomialCutoff_p : int
-        p-exponent used in polynomial cutoff function, smaller p corresponds to stronger decay with distance
-    invariant_layers : int
-        number of radial layers, usually 1-3 works best, smaller is faster
-    invariant_neurons : int
-        number of hidden neurons in radial function, smaller is faster
-    use_sc : bool
-        use self-connection or not, usually gives big improvement
-    irreps_edge_sh : str
-        irreps for the chemical embedding of species
-    feature_irreps_hidden : str
-        irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster
-    chemical_embedding_irreps_out : str
-        irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer
-    conv_to_output_hidden_irreps_out : str
-        irreps used in hidden layer of output block
+    num_radial_basis : int, optional
+        number of radial basis functions
+    num_cutoff_basis : int, optional
+        number of basis functions for smooth cutoff
+    max_ell : int, optional
+        highest ell of spherical harmonics
+    interaction : str, optional
+        name of interaction block
+    num_interactions : int, optional
+        number of interactions
+    hidden_irreps : str, optional
+        hidden irreps
+    pair_repulsion : bool
+        use amsgrad variant of optimizer
+    distance_transform : str, optional
+        distance transform
+    correlation : int
+        correlation order at each layer
+    gate : str, optional
+        non linearity for last readout
+    MLP_irreps : str, optional
+        hidden irreps of the MLP in last readout
+    radial_type : str, optional
+        type of radial basis functions
+    radial_MLP : str, optional
+        width of the radial MLP
+    std : float, optional
+        Standard deviation of force components in the training set
     """
 
     mm_types: list[int]
-    e0: torch.Tensor
 
     def __init__(
         self,
         type_map: list[str],
         sel: int,
-        r_max: float = 6.0,
-        num_layers: int = 4,
-        l_max: int = 2,
-        num_features: int = 32,
-        nonlinearity_type: str = "gate",
-        parity: bool = True,
-        num_basis: int = 8,
-        BesselBasis_trainable: bool = True,
-        PolynomialCutoff_p: int = 6,
-        invariant_layers: int = 2,
-        invariant_neurons: int = 64,
-        use_sc: bool = True,
-        irreps_edge_sh: str = "0e + 1e",
-        feature_irreps_hidden: str = "32x0o + 32x0e + 32x1o + 32x1e",
-        chemical_embedding_irreps_out: str = "32x0e",
-        conv_to_output_hidden_irreps_out: str = "16x0e",
+        r_max: float = 5.0,
+        num_radial_basis: int = 8,
+        num_cutoff_basis: int = 5,
+        max_ell: int = 3,
+        interaction: str = "RealAgnosticResidualInteractionBlock",
+        num_interactions: int = 2,
+        hidden_irreps: str = "128x0e + 128x1o",
+        pair_repulsion: bool = False,
+        distance_transform: str = "None",
+        correlation: int = 3,
+        gate: str = "silu",
+        MLP_irreps: str = "16x0e",
+        radial_type: str = "bessel",
+        radial_MLP: list[int] = [64, 64, 64],  # noqa: B006
+        std: float = 1,
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         super().__init__(**kwargs)
@@ -125,70 +253,65 @@ class NequipModel(BaseModel):
             "type_map": type_map,
             "sel": sel,
             "r_max": r_max,
-            "num_layers": num_layers,
-            "l_max": l_max,
-            "num_features": num_features,
-            "nonlinearity_type": nonlinearity_type,
-            "parity": parity,
-            "num_basis": num_basis,
-            "BesselBasis_trainable": BesselBasis_trainable,
-            "PolynomialCutoff_p": PolynomialCutoff_p,
-            "invariant_layers": invariant_layers,
-            "invariant_neurons": invariant_neurons,
-            "use_sc": use_sc,
-            "irreps_edge_sh": irreps_edge_sh,
-            "feature_irreps_hidden": feature_irreps_hidden,
-            "chemical_embedding_irreps_out": chemical_embedding_irreps_out,
-            "conv_to_output_hidden_irreps_out": conv_to_output_hidden_irreps_out,
+            "num_radial_basis": num_radial_basis,
+            "num_cutoff_basis": num_cutoff_basis,
+            "max_ell": max_ell,
+            "interaction": interaction,
+            "num_interactions": num_interactions,
+            "hidden_irreps": hidden_irreps,
+            "pair_repulsion": pair_repulsion,
+            "distance_transform": distance_transform,
+            "correlation": correlation,
+            "gate": gate,
+            "MLP_irreps": MLP_irreps,
+            "radial_type": radial_type,
+            "radial_MLP": radial_MLP,
+            "std": std,
         }
         self.type_map = type_map
         self.ntypes = len(type_map)
+        self.rcut = r_max
+        self.num_interactions = num_interactions
+        atomic_numbers = []
         self.preset_out_bias: dict[str, list] = {"energy": []}
         self.mm_types = []
         self.sel = sel
-        self.num_layers = num_layers
         for ii, tt in enumerate(type_map):
+            atomic_numbers.append(PeriodicTable[tt])
             if not tt.startswith("m") and tt not in {"HW", "OW"}:
                 self.preset_out_bias["energy"].append(None)
             else:
                 self.preset_out_bias["energy"].append([0])
                 self.mm_types.append(ii)
 
-        self.rcut = r_max
         self.model = script(
-            model_from_config(
-                {
-                    "model_builders": ["EnergyModel"],
-                    "avg_num_neighbors": sel,
-                    "chemical_symbols": type_map,
-                    "num_types": self.ntypes,
-                    "r_max": r_max,
-                    "num_layers": num_layers,
-                    "l_max": l_max,
-                    "num_features": num_features,
-                    "nonlinearity_type": nonlinearity_type,
-                    "parity": parity,
-                    "num_basis": num_basis,
-                    "BesselBasis_trainable": BesselBasis_trainable,
-                    "PolynomialCutoff_p": PolynomialCutoff_p,
-                    "invariant_layers": invariant_layers,
-                    "invariant_neurons": invariant_neurons,
-                    "use_sc": use_sc,
-                    "irreps_edge_sh": irreps_edge_sh,
-                    "feature_irreps_hidden": feature_irreps_hidden,
-                    "chemical_embedding_irreps_out": chemical_embedding_irreps_out,
-                    "conv_to_output_hidden_irreps_out": conv_to_output_hidden_irreps_out,
-                },
+            ScaleShiftMACE(
+                r_max=r_max,
+                num_bessel=num_radial_basis,
+                num_polynomial_cutoff=num_cutoff_basis,
+                max_ell=max_ell,
+                interaction_cls=interaction_classes[interaction],
+                num_interactions=num_interactions,
+                num_elements=self.ntypes,
+                hidden_irreps=o3.Irreps(hidden_irreps),
+                atomic_energies=torch.zeros(self.ntypes),  # pylint: disable=no-explicit-device,no-explicit-dtype
+                avg_num_neighbors=sel,
+                atomic_numbers=atomic_numbers,
+                pair_repulsion=pair_repulsion,
+                distance_transform=distance_transform,
+                correlation=correlation,
+                gate=gate_dict[gate],
+                interaction_cls_first=interaction_classes[
+                    "RealAgnosticInteractionBlock"
+                ],
+                MLP_irreps=o3.Irreps(MLP_irreps),
+                atomic_inter_scale=std,
+                atomic_inter_shift=0.0,
+                radial_MLP=radial_MLP,
+                radial_type=radial_type,
             ),
         )
-        self.register_buffer(
-            "e0",
-            torch.zeros(
-                self.ntypes,
-                dtype=env.GLOBAL_PT_ENER_FLOAT_PRECISION,
-                device=env.DEVICE,
-            ),
-        )
+        self.atomic_numbers = atomic_numbers
 
     def compute_or_load_stat(
         self,
@@ -219,11 +342,11 @@ class NequipModel(BaseModel):
             preset_bias=self.preset_out_bias,
         )
         if "energy" in bias_out:
-            self.e0 = (
+            self.model.atomic_energies_fn.atomic_energies = (
                 bias_out["energy"]
-                .view(self.e0.shape)
-                .to(self.e0.dtype)
-                .to(self.e0.device)
+                .view(self.model.atomic_energies_fn.atomic_energies.shape)
+                .to(self.model.atomic_energies_fn.atomic_energies.dtype)
+                .to(self.model.atomic_energies_fn.atomic_energies.device)
             )
 
     @torch.jit.export
@@ -244,7 +367,7 @@ class NequipModel(BaseModel):
     @torch.jit.export
     def get_rcut(self) -> float:
         """Get the cut-off radius."""
-        return self.rcut * self.num_layers
+        return self.rcut * self.num_interactions
 
     @torch.jit.export
     def get_type_map(self) -> list[str]:
@@ -350,7 +473,6 @@ class NequipModel(BaseModel):
             aparam=aparam,
             do_atomic_virial=do_atomic_virial,
             comm_dict=None,
-            box=box,
         )
         model_ret = communicate_extended_output(
             model_ret_lower,
@@ -402,16 +524,17 @@ class NequipModel(BaseModel):
         """
         nloc = nlist.shape[1]
         nf, nall = extended_atype.shape
-        # recalculate nlist for ghost atoms
-        if self.num_layers > 1 and nloc < nall:
+        # calculate nlist for ghost atoms, as LAMMPS does not calculate it
+        if mapping is None and self.num_interactions > 1 and nloc < nall:
             nlist = build_neighbor_list(
                 extended_coord.view(nf, -1),
                 extended_atype,
                 nall,
-                self.rcut * self.num_layers,
+                self.rcut,
                 self.sel,
                 distinguish_types=False,
             )
+
         model_ret = self.forward_lower_common(
             nloc,
             extended_coord,
@@ -443,7 +566,6 @@ class NequipModel(BaseModel):
         aparam: Optional[torch.Tensor] = None,
         do_atomic_virial: bool = False,  # noqa: ARG002
         comm_dict: Optional[dict[str, torch.Tensor]] = None,
-        box: Optional[torch.Tensor] = None,
     ) -> dict[str, torch.Tensor]:
         """Forward lower common pass of the model.
 
@@ -465,11 +587,8 @@ class NequipModel(BaseModel):
             Whether to compute atomic virial.
         comm_dict : dict[str, torch.Tensor], optional
             The communication dictionary.
-        box : torch.Tensor, optional
-            The box tensor.
         """
         nf, nall = extended_atype.shape
-
         extended_coord = extended_coord.view(nf, nall, 3)
         extended_coord_ = extended_coord
         if fparam is not None:
@@ -495,57 +614,86 @@ class NequipModel(BaseModel):
             extended_coord_ff = extended_coord[ff]
             extended_atype_ff = extended_atype[ff]
             nlist_ff = nlist[ff]
-            edge_index = torch.ops.deepmd_mace.mace_edge_index(
+            edge_index = torch.ops.deepmd_gnn.mace_edge_index(
                 nlist_ff,
                 extended_atype_ff,
                 torch.tensor(self.mm_types, dtype=torch.int64, device="cpu"),
             )
             edge_index = edge_index.T
-            # Nequip and MACE have different defination for edge_index
-            edge_index = edge_index[[1, 0]]
+            # to one hot
+            indices = extended_atype_ff.unsqueeze(-1)
+            oh = torch.zeros(
+                (nall, self.ntypes),
+                device=extended_atype.device,
+                dtype=torch.float64,
+            )
+            # scatter_ is the in-place version of scatter
+            oh.scatter_(dim=-1, index=indices, value=1)
+            one_hot = oh.view((nall, self.ntypes))
 
-            # nequip can convert dtype by itself
-            default_dtype = torch.float64
+            # cast to float32
+            default_dtype = self.model.atomic_energies_fn.atomic_energies.dtype
             extended_coord_ff = extended_coord_ff.to(default_dtype)
             extended_coord_ff.requires_grad_(True)  # noqa: FBT003
-
-            input_dict = {
-                "pos": extended_coord_ff,
-                "edge_index": edge_index,
-                "atom_types": extended_atype_ff,
-            }
-            if box is not None and mapping is not None:
-                # pass box, map edge index to real
-                box_ff = box[ff].to(extended_coord_ff.device)
-                input_dict["cell"] = box_ff
-                input_dict["pbc"] = torch.zeros(
-                    3,
-                    dtype=torch.bool,
-                    device=box_ff.device,
-                )
+            nedge = edge_index.shape[1]
+            if self.num_interactions > 1 and mapping is not None and nloc < nall:
+                # shift the edges for ghost atoms, and map the ghost atoms to real atoms
                 shifts_atoms = extended_coord_ff - extended_coord_ff[mapping[ff]]
                 shifts = shifts_atoms[edge_index[1]] - shifts_atoms[edge_index[0]]
                 edge_index = mapping[ff][edge_index]
-                input_dict["edge_index"] = edge_index
-                edge_cell_shift = phys2inter(shifts, box_ff.view(3, 3))
-                input_dict["edge_cell_shift"] = edge_cell_shift
-
-            ret = self.model.forward(
-                input_dict,
+            else:
+                shifts = torch.zeros(
+                    (nedge, 3),
+                    dtype=torch.float64,
+                    device=extended_coord_.device,
+                )
+            shifts = shifts.to(default_dtype)
+            one_hot = one_hot.to(default_dtype)
+            # it seems None is not allowed for data
+            box = (
+                torch.eye(
+                    3,
+                    dtype=extended_coord_ff.dtype,
+                    device=extended_coord_ff.device,
+                )
+                * 1000.0
             )
 
-            atom_energy = ret["atomic_energy"]
+            ret = self.model.forward(
+                {
+                    "positions": extended_coord_ff,
+                    "shifts": shifts,
+                    "cell": box,
+                    "edge_index": edge_index,
+                    "batch": torch.zeros(
+                        [nall],
+                        dtype=torch.int64,
+                        device=extended_coord_ff.device,
+                    ),
+                    "node_attrs": one_hot,
+                    "ptr": torch.tensor(
+                        [0, nall],
+                        dtype=torch.int64,
+                        device=extended_coord_ff.device,
+                    ),
+                    "weight": torch.tensor(
+                        [1.0],
+                        dtype=extended_coord_ff.dtype,
+                        device=extended_coord_ff.device,
+                    ),
+                },
+                compute_force=False,
+                compute_virials=False,
+                compute_stress=False,
+                compute_displacement=False,
+                training=self.training,
+            )
+
+            atom_energy = ret["node_energy"]
             if atom_energy is None:
                 msg = "atom_energy is None"
                 raise ValueError(msg)
             atom_energy = atom_energy.view(1, nall).to(extended_coord_.dtype)[:, :nloc]
-            # adds e0
-            atom_energy = atom_energy + self.e0[extended_atype_ff[:nloc]].view(
-                1,
-                nloc,
-            ).to(
-                atom_energy.dtype,
-            )
             energy = torch.sum(atom_energy, dim=1).view(1, 1).to(extended_coord_.dtype)
             grad_outputs: list[Optional[torch.Tensor]] = [
                 torch.ones_like(energy),
@@ -600,26 +748,22 @@ class NequipModel(BaseModel):
             "type": "mace",
             **self.params,
             "@variables": {
-                **{
-                    kk: to_numpy_array(vv) for kk, vv in self.model.state_dict().items()
-                },
-                "e0": to_numpy_array(self.e0),
+                kk: to_numpy_array(vv) for kk, vv in self.model.state_dict().items()
             },
         }
 
     @classmethod
-    def deserialize(cls, data: dict) -> "NequipModel":
+    def deserialize(cls, data: dict) -> "MaceModel":
         """Deserialize the model."""
         data = data.copy()
         if not (data.pop("@class") == "Model" and data.pop("type") == "mace"):
-            msg = "data is not a serialized NequipModel"
+            msg = "data is not a serialized MaceModel"
             raise ValueError(msg)
         check_version_compatibility(data.pop("@version"), 1, 1)
         variables = {
             kk: to_torch_tensor(vv) for kk, vv in data.pop("@variables").items()
         }
         model = cls(**data)
-        model.e0 = variables.pop("e0")
         model.model.load_state_dict(variables)
         return model
 
@@ -696,7 +840,7 @@ class NequipModel(BaseModel):
         return ModelOutputDef(self.fitting_output_def())
 
     @classmethod
-    def get_model(cls, model_params: dict) -> "NequipModel":
+    def get_model(cls, model_params: dict) -> "MaceModel":
         """Get the model by the parameters.
 
         Parameters

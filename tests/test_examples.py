@@ -7,7 +7,7 @@ import pytest
 from dargs.check import check
 from deepmd.utils.argcheck import gen_args
 
-from deepmd_mace.argcheck import mace_model_args  # noqa: F401
+from deepmd_gnn.argcheck import mace_model_args  # noqa: F401
 
 example_path = Path(__file__).parent.parent / "examples"
 

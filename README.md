@@ -1,19 +1,24 @@
-# MACE plugin for DeePMD-kit
+# DeePMD-kit plugin for various graph neural network models
 
 <!-- [![PyPI - Version](https://img.shields.io/pypi/v/python-template)](https://pypi.org/p/python-template) -->
 
-`deepmd-mace` is a [MACE](https://github.com/ACEsuit/mace) plugin for [DeePMD-kit](https://github.com/deepmodeling/deepmd-kit), which connects MACE (PyTorch version) and DeePMD-kit by enabling MACE models in DeePMD-kit PyTorch backend.
+`deepmd-gnn` is a [DeePMD-kit](https://github.com/deepmodeling/deepmd-kit) plugin for various graph neural network (GNN) models, which connects DeePMD-kit and atomistic GNN packages by enabling GNN models in DeePMD-kit.
 
-After [installing the plugin](#installation), you can train the MACE model using DeePMD-kit, run active learning cycles for the MACE model using [DP-GEN](https://github.com/deepmodeling/dpgen), perform simulations with the MACE model using molecular dynamic packages supported by DeePMD-kit, such as [LAMMPS](https://github.com/lammps/lammps) and [AMBER](https://ambermd.org/).
-You can follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/) to train the MACE models using its PyTorch backend, after using the specific [MACE parameters](#parameters).
+Supported packages and models include:
+
+- [MACE](https://github.com/ACEsuit/mace) (PyTorch version)
+- [NequIP](https://github.com/mir-group/nequip) (PyTorch version)
+
+After [installing the plugin](#installation), you can train the GNN models using DeePMD-kit, run active learning cycles for the GNN models using [DP-GEN](https://github.com/deepmodeling/dpgen), perform simulations with the MACE model using molecular dynamic packages supported by DeePMD-kit, such as [LAMMPS](https://github.com/lammps/lammps) and [AMBER](https://ambermd.org/).
+You can follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/) to train the GNN models using its PyTorch backend, after using the specific [model parameters](#parameters).
 
 ## Installation
 
 First, clone this repository:
 
 ```sh
-git clone https://github.com/njzjz/deepmd-mace
-cd deepmd-mace
+git clone https://github.com/njzjz/deepmd-gnn
+cd deepmd-gnn
 ```
 
 ### Python interface plugin
@@ -31,7 +36,7 @@ pip install .
 
 ### C++ interface plugin
 
-DeePMD-kit needs to support [customized OP library in C++ interface](https://github.com/deepmodeling/deepmd-kit/pull/4073) (available after Aug 23, 2024).
+DeePMD-kit version should be v3.0.0b4 or later.
 
 Follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/install/install-from-source.html#install-the-c-interface) to install DeePMD-kit C++ interface with PyTorch backend support and other related MD packages.
 After that, you can build the plugin
@@ -45,11 +50,11 @@ cmake --build . -j8
 cmake --install .
 ```
 
-`libdeepmd_mace.so` will be installed into the directory you assign.
+`libdeepmd_gnn.so` will be installed into the directory you assign.
 When using any DeePMD-kit C++ interface, set the following environment variable in advance:
 
 ```sh
-export DP_PLUGIN_PATH=/prefix/to/install/lib/libdeepmd_mace.so
+export DP_PLUGIN_PATH=/prefix/to/install/lib/libdeepmd_gnn.so
 ```
 
 ## Usage
@@ -65,6 +70,8 @@ A frozen model file named `frozen_model.pth` will be generated. You can use it i
 For details, follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/).
 
 ## Parameters
+
+### MACE
 
 To use the MACE model, set `"type": "mace"` in the `model` section of the training script.
 Below is default values for the MACE model, most of which follows default values in the MACE package:
@@ -96,12 +103,41 @@ Below is default values for the MACE model, most of which follows default values
 }
 ```
 
+### NequIP
+
+```json
+"model": {
+  "type": "nequip",
+  "type_map": [
+    "O",
+    "H"
+  ],
+  "r_max": 5.0,
+  "sel": "auto",
+  "num_layers": 4,
+  "l_max": 2,
+  "num_features": 32,
+  "nonlinearity_type": "gate",
+  "parity": true,
+  "num_basis": 8,
+  "BesselBasis_trainable": true,
+  "PolynomialCutoff_p": 6,
+  "invariant_layers": 2,
+  "invariant_neurons": 64,
+  "use_sc": true,
+  "irreps_edge_sh": "0e + 1e",
+  "feature_irreps_hidden": "32x0o + 32x0e + 32x1o + 32x1e",
+  "chemical_embedding_irreps_out": "32x0e",
+  "conv_to_output_hidden_irreps_out": "16x0e"
+}
+```
+
 ## DPRc support
 
-In `deepmd-mace`, the MACE model can be used in a [DPRc](https://docs.deepmodeling.com/projects/deepmd/en/latest/model/dprc.html) way.
+In `deepmd-gnn`, the GNN model can be used in a [DPRc](https://docs.deepmodeling.com/projects/deepmd/en/latest/model/dprc.html) way.
 Type maps that starts with `m` (such as `mH`) or `OW` or `HW` will be recognized as MM types.
 Two MM atoms will not build edges with each other.
-Such MACE+DPRc model can be directly used in AmberTools24.
+Such GNN+DPRc model can be directly used in AmberTools24.
 
 ## Examples
 

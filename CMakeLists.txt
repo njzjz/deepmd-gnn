@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(DeePMD-MACE CXX)
+project(deepmd-gnn CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 macro(set_if_higher VARIABLE VALUE)

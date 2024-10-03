@@ -1,22 +1,22 @@
 file(GLOB OP_SRC mace.cc)
 
-add_library(deepmd_mace MODULE ${OP_SRC})
+add_library(deepmd_gnn MODULE ${OP_SRC})
 # link: libdeepmd libtorch
-target_link_libraries(deepmd_mace PRIVATE ${TORCH_LIBRARIES})
+target_link_libraries(deepmd_gnn PRIVATE ${TORCH_LIBRARIES})
 target_compile_definitions(
-  deepmd_mace
+  deepmd_gnn
   PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:_GLIBCXX_USE_CXX11_ABI=${OP_CXX_ABI_PT}>")
 if(APPLE)
-  set_target_properties(deepmd_mace PROPERTIES INSTALL_RPATH "@loader_path")
+  set_target_properties(deepmd_gnn PROPERTIES INSTALL_RPATH "@loader_path")
 else()
-  set_target_properties(deepmd_mace PROPERTIES INSTALL_RPATH "$ORIGIN")
+  set_target_properties(deepmd_gnn PROPERTIES INSTALL_RPATH "$ORIGIN")
 endif()
 
 if(BUILD_PY_IF)
-  install(TARGETS deepmd_mace DESTINATION deepmd_mace/lib/)
+  install(TARGETS deepmd_gnn DESTINATION deepmd_gnn/lib/)
   file(TOUCH ${CMAKE_CURRENT_BINARY_DIR}/__init__.py)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
-          DESTINATION deepmd_mace/lib)
+          DESTINATION deepmd_gnn/lib)
 else(BUILD_PY_IF)
-  install(TARGETS deepmd_mace DESTINATION lib/)
+  install(TARGETS deepmd_gnn DESTINATION lib/)
 endif(BUILD_PY_IF)
