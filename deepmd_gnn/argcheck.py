@@ -147,6 +147,7 @@ def nequip_model_args() -> Argument:
     doc_feature_irreps_hidden = "irreps used for hidden features, here we go up to lmax=1, with even and odd parities; for more accurate but slower networks, use l=2 or higher, smaller number of features is faster"
     doc_chemical_embedding_irreps_out = "irreps of the spherical harmonics used for edges. If a single integer, indicates the full SH up to L_max=that_integer"
     doc_conv_to_output_hidden_irreps_out = "irreps used in hidden layer of output block"
+    doc_precision = "Precision of the model, float32 or float64"
     return Argument(
         "nequip",
         dict,
@@ -268,6 +269,13 @@ def nequip_model_args() -> Argument:
                 optional=True,
                 default="16x0e",
                 doc=doc_conv_to_output_hidden_irreps_out,
+            ),
+            Argument(
+                "precision",
+                str,
+                optional=True,
+                default="float32",
+                doc=doc_precision,
             ),
         ],
         doc="Nequip model",

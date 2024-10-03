@@ -1062,9 +1062,11 @@ class TestMaceModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: igno
         """Set up class."""
         EnerModelTest.setUpClass()
 
+        torch.manual_seed(GLOBAL_SEED + 1)
         cls.module = MaceModel(
             type_map=cls.expected_type_map,
             sel=138,
+            precision="float64",
         )
         with torch.jit.optimized_execution(should_optimize=False):
             cls._script_module = torch.jit.script(cls.module)
@@ -1100,11 +1102,13 @@ class TestNequipModel(unittest.TestCase, EnerModelTest, PTTestCase):  # type: ig
         """Set up class."""
         EnerModelTest.setUpClass()
 
+        torch.manual_seed(GLOBAL_SEED + 1)
         cls.module = NequipModel(
             type_map=cls.expected_type_map,
             sel=138,
             r_max=cls.expected_rcut,
             num_layers=2,
+            precision="float64",
         )
         with torch.jit.optimized_execution(should_optimize=False):
             cls._script_module = torch.jit.script(cls.module)
