@@ -614,7 +614,7 @@ class MaceModel(BaseModel):
             extended_coord_ff = extended_coord[ff]
             extended_atype_ff = extended_atype[ff]
             nlist_ff = nlist[ff]
-            edge_index = torch.ops.deepmd_gnn.mace_edge_index(
+            edge_index = torch.ops.deepmd_gnn.edge_index(
                 nlist_ff,
                 extended_atype_ff,
                 torch.tensor(self.mm_types, dtype=torch.int64, device="cpu"),
