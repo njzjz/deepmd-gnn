@@ -6,10 +6,18 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 
-def test_e2e_training() -> None:
-    """Test training the MACE model."""
-    input_fn = "input.json"
+
+@pytest.mark.parametrize(
+    "input_fn",
+    [
+        "mace.json",
+        "nequip.json",
+    ],
+)
+def test_e2e_training(input_fn) -> None:
+    """Test training the model."""
     model_fn = "model.pth"
     # create temp directory and copy example files
     with tempfile.TemporaryDirectory() as _tmpdir:
