@@ -15,7 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/requirements*.txt
+            **/pyproject.toml
       - name: Build dist
         run: uv tool run --with build[uv] --from build python -m build --installer uv --sdist
       - name: Upload release distributions
