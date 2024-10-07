@@ -17,6 +17,7 @@ from deepmd.pt.model.model.model import (
 from deepmd.pt.model.model.transform_output import (
     communicate_extended_output,
 )
+from deepmd.pt.utils import env
 from deepmd.pt.utils.nlist import (
     build_neighbor_list,
     extend_input_and_build_neighbor_list,
@@ -309,7 +310,7 @@ class MaceModel(BaseModel):
                 atomic_inter_shift=0.0,
                 radial_MLP=radial_MLP,
                 radial_type=radial_type,
-            ),
+            ).to(env.DEVICE),
         )
         self.atomic_numbers = atomic_numbers
 
@@ -604,140 +605,128 @@ class MaceModel(BaseModel):
         extended_atype = extended_atype.to(torch.int64)
         nall = extended_coord.shape[1]
 
-        # loop on nf
-        energies = []
-        forces = []
-        virials = []
-        atom_energies = []
-        atomic_virials = []
-        for ff in range(nf):
-            extended_coord_ff = extended_coord[ff]
-            extended_atype_ff = extended_atype[ff]
-            nlist_ff = nlist[ff]
-            edge_index = torch.ops.deepmd_gnn.edge_index(
-                nlist_ff,
-                extended_atype_ff,
-                torch.tensor(self.mm_types, dtype=torch.int64, device="cpu"),
-            )
-            edge_index = edge_index.T
-            # to one hot
-            indices = extended_atype_ff.unsqueeze(-1)
-            oh = torch.zeros(
-                (nall, self.ntypes),
-                device=extended_atype.device,
-                dtype=torch.float64,
-            )
-            # scatter_ is the in-place version of scatter
-            oh.scatter_(dim=-1, index=indices, value=1)
-            one_hot = oh.view((nall, self.ntypes))
+        # fake as one frame
+        extended_coord_ff = extended_coord.view(nf * nall, 3)
+        extended_atype_ff = extended_atype.view(nf * nall)
+        edge_index = torch.ops.deepmd_gnn.edge_index(
+            nlist,
+            extended_atype,
+            torch.tensor(self.mm_types, dtype=torch.int64, device="cpu"),
+        )
+        edge_index = edge_index.T
+        # to one hot
+        indices = extended_atype_ff.unsqueeze(-1)
+        oh = torch.zeros(
+            (nf * nall, self.ntypes),
+            device=extended_atype.device,
+            dtype=torch.float64,
+        )
+        # scatter_ is the in-place version of scatter
+        oh.scatter_(dim=-1, index=indices, value=1)
+        one_hot = oh.view((nf * nall, self.ntypes))
 
-            # cast to float32
-            default_dtype = self.model.atomic_energies_fn.atomic_energies.dtype
-            extended_coord_ff = extended_coord_ff.to(default_dtype)
-            extended_coord_ff.requires_grad_(True)  # noqa: FBT003
-            nedge = edge_index.shape[1]
-            if self.num_interactions > 1 and mapping is not None and nloc < nall:
-                # shift the edges for ghost atoms, and map the ghost atoms to real atoms
-                shifts_atoms = extended_coord_ff - extended_coord_ff[mapping[ff]]
-                shifts = shifts_atoms[edge_index[1]] - shifts_atoms[edge_index[0]]
-                edge_index = mapping[ff][edge_index]
-            else:
-                shifts = torch.zeros(
-                    (nedge, 3),
-                    dtype=torch.float64,
-                    device=extended_coord_.device,
-                )
-            shifts = shifts.to(default_dtype)
-            one_hot = one_hot.to(default_dtype)
-            # it seems None is not allowed for data
-            box = (
-                torch.eye(
-                    3,
+        # cast to float32
+        default_dtype = self.model.atomic_energies_fn.atomic_energies.dtype
+        extended_coord_ff = extended_coord_ff.to(default_dtype)
+        extended_coord_ff.requires_grad_(True)  # noqa: FBT003
+        nedge = edge_index.shape[1]
+        if self.num_interactions > 1 and mapping is not None and nloc < nall:
+            # shift the edges for ghost atoms, and map the ghost atoms to real atoms
+            mapping_ff = mapping.view(nf * nall) + torch.arange(
+                0,
+                nf * nall,
+                nall,
+                dtype=mapping.dtype,
+                device=mapping.device,
+            ).unsqueeze(-1).expand(nf, nall).reshape(-1)
+            shifts_atoms = extended_coord_ff - extended_coord_ff[mapping_ff]
+            shifts = shifts_atoms[edge_index[1]] - shifts_atoms[edge_index[0]]
+            edge_index = mapping_ff[edge_index]
+        else:
+            shifts = torch.zeros(
+                (nedge, 3),
+                dtype=torch.float64,
+                device=extended_coord_.device,
+            )
+        shifts = shifts.to(default_dtype)
+        one_hot = one_hot.to(default_dtype)
+        # it seems None is not allowed for data
+        box = (
+            torch.eye(
+                3,
+                dtype=extended_coord_ff.dtype,
+                device=extended_coord_ff.device,
+            )
+            * 1000.0
+        )
+
+        ret = self.model.forward(
+            {
+                "positions": extended_coord_ff,
+                "shifts": shifts,
+                "cell": box,
+                "edge_index": edge_index,
+                "batch": torch.zeros(
+                    [nf * nall],
+                    dtype=torch.int64,
+                    device=extended_coord_ff.device,
+                ),
+                "node_attrs": one_hot,
+                "ptr": torch.tensor(
+                    [0, nf * nall],
+                    dtype=torch.int64,
+                    device=extended_coord_ff.device,
+                ),
+                "weight": torch.tensor(
+                    [1.0],
                     dtype=extended_coord_ff.dtype,
                     device=extended_coord_ff.device,
-                )
-                * 1000.0
-            )
+                ),
+            },
+            compute_force=False,
+            compute_virials=False,
+            compute_stress=False,
+            compute_displacement=False,
+            training=self.training,
+        )
 
-            ret = self.model.forward(
-                {
-                    "positions": extended_coord_ff,
-                    "shifts": shifts,
-                    "cell": box,
-                    "edge_index": edge_index,
-                    "batch": torch.zeros(
-                        [nall],
-                        dtype=torch.int64,
-                        device=extended_coord_ff.device,
-                    ),
-                    "node_attrs": one_hot,
-                    "ptr": torch.tensor(
-                        [0, nall],
-                        dtype=torch.int64,
-                        device=extended_coord_ff.device,
-                    ),
-                    "weight": torch.tensor(
-                        [1.0],
-                        dtype=extended_coord_ff.dtype,
-                        device=extended_coord_ff.device,
-                    ),
-                },
-                compute_force=False,
-                compute_virials=False,
-                compute_stress=False,
-                compute_displacement=False,
-                training=self.training,
-            )
-
-            atom_energy = ret["node_energy"]
-            if atom_energy is None:
-                msg = "atom_energy is None"
-                raise ValueError(msg)
-            atom_energy = atom_energy.view(1, nall).to(extended_coord_.dtype)[:, :nloc]
-            energy = torch.sum(atom_energy, dim=1).view(1, 1).to(extended_coord_.dtype)
-            grad_outputs: list[Optional[torch.Tensor]] = [
-                torch.ones_like(energy),
-            ]
-            force = torch.autograd.grad(
-                outputs=[energy],
-                inputs=[extended_coord_ff],
-                grad_outputs=grad_outputs,
-                retain_graph=True,
-                create_graph=self.training,
-            )[0]
-            if force is None:
-                msg = "force is None"
-                raise ValueError(msg)
-            force = -force
-            atomic_virial = force.unsqueeze(-1).to(
-                extended_coord_.dtype,
-            ) @ extended_coord_ff.unsqueeze(-2).to(
-                extended_coord_.dtype,
-            )
-            force = force.view(1, nall, 3).to(extended_coord_.dtype)
-            virial = (
-                torch.sum(atomic_virial, dim=0).view(1, 9).to(extended_coord_.dtype)
-            )
-
-            energies.append(energy)
-            forces.append(force)
-            virials.append(virial)
-            atom_energies.append(atom_energy)
-            atomic_virials.append(atomic_virial)
-        energies_t = torch.cat(energies, dim=0)
-        forces_t = torch.cat(forces, dim=0)
-        virials_t = torch.cat(virials, dim=0)
-        atom_energies_t = torch.cat(atom_energies, dim=0)
-        atomic_virials_t = torch.cat(atomic_virials, dim=0)
+        atom_energy = ret["node_energy"]
+        if atom_energy is None:
+            msg = "atom_energy is None"
+            raise ValueError(msg)
+        atom_energy = atom_energy.view(nf, nall).to(extended_coord_.dtype)[:, :nloc]
+        energy = torch.sum(atom_energy, dim=1).view(nf, 1).to(extended_coord_.dtype)
+        grad_outputs: list[Optional[torch.Tensor]] = [
+            torch.ones_like(energy),
+        ]
+        force = torch.autograd.grad(
+            outputs=[energy],
+            inputs=[extended_coord_ff],
+            grad_outputs=grad_outputs,
+            retain_graph=True,
+            create_graph=self.training,
+        )[0]
+        if force is None:
+            msg = "force is None"
+            raise ValueError(msg)
+        force = -force
+        atomic_virial = force.unsqueeze(-1).to(
+            extended_coord_.dtype,
+        ) @ extended_coord_ff.unsqueeze(-2).to(
+            extended_coord_.dtype,
+        )
+        force = force.view(nf, nall, 3).to(extended_coord_.dtype)
+        atomic_virial = atomic_virial.view(nf, nall, 1, 9)
+        virial = torch.sum(atomic_virial, dim=1).view(nf, 9).to(extended_coord_.dtype)
 
         return {
-            "energy_redu": energies_t.view(nf, 1),
-            "energy_derv_r": forces_t.view(nf, nall, 1, 3),
-            "energy_derv_c_redu": virials_t.view(nf, 1, 9),
+            "energy_redu": energy.view(nf, 1),
+            "energy_derv_r": force.view(nf, nall, 1, 3),
+            "energy_derv_c_redu": virial.view(nf, 1, 9),
             # take the first nloc atoms to match other models
-            "energy": atom_energies_t.view(nf, nloc, 1),
+            "energy": atom_energy.view(nf, nloc, 1),
             # fake atom_virial
-            "energy_derv_c": atomic_virials_t.view(nf, nall, 1, 9),
+            "energy_derv_c": atomic_virial.view(nf, nall, 1, 9),
         }
 
     def serialize(self) -> dict:
