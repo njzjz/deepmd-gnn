@@ -43,7 +43,7 @@ torch::Tensor edge_index_kernel(const torch::Tensor &nlist_tensor,
   for (int64_t ff = 0; ff < nf; ff++) {
     for (int64_t ii = 0; ii < nloc; ii++) {
       for (int64_t jj = 0; jj < nnei; jj++) {
-        int64_t idx = ii * nnei + jj;
+        int64_t idx = ff * nloc * nnei + ii * nnei + jj;
         int64_t kk = nlist[idx];
         if (kk < 0) {
           continue;
