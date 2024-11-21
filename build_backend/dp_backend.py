@@ -41,6 +41,7 @@ def cibuildwheel_dependencies() -> list[str]:
 def get_requires_for_build_wheel(
     config_settings: dict,
 ) -> list[str]:
+    """Return the dependencies for building a wheel."""
     return (
         _orig.get_requires_for_build_wheel(config_settings)
         + cibuildwheel_dependencies()
