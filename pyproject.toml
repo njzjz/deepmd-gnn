@@ -107,7 +107,7 @@ test-command = [
 build = ["cp312-*"]
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
 before-build = [
-    "uv pip install deepmd-kit[torch]",
+    "uv pip install deepmd-kit[torch]>=3.0.0b2",
     """export CMAKE_PREFIX_PATH=$(python -c "import torch;print(torch.utils.cmake_prefix_path)")""",
 ]
 
