@@ -54,6 +54,7 @@ from mace.modules import (
 )
 
 import deepmd_gnn.op  # noqa: F401
+from deepmd_gnn import env
 
 ELEMENTS = [
     "H",
@@ -368,6 +369,8 @@ class MaceModel(BaseModel):
     @torch.jit.export
     def get_rcut(self) -> float:
         """Get the cut-off radius."""
+        if env.DP_GNN_USE_MAPPING:
+            return self.rcut
         return self.rcut * self.num_interactions
 
     @torch.jit.export
@@ -527,6 +530,13 @@ class MaceModel(BaseModel):
         nf, nall = extended_atype.shape
         # calculate nlist for ghost atoms, as LAMMPS does not calculate it
         if mapping is None and self.num_interactions > 1 and nloc < nall:
+            if env.DP_GNN_USE_MAPPING:
+                # when setting DP_GNN_USE_MAPPING, ghost atoms are only built
+                # for one message-passing layer
+                raise ValueError(
+                    "When setting DP_GNN_USE_MAPPING, mapping is required. "
+                    "If you are using LAMMPS, set `atom_modify map yes`."
+                )
             nlist = build_neighbor_list(
                 extended_coord.view(nf, -1),
                 extended_atype,

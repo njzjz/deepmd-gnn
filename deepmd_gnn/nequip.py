@@ -46,6 +46,7 @@ from e3nn.util.jit import (
 )
 from nequip.model import model_from_config
 
+from deepmd_gnn import env
 
 @BaseModel.register("nequip")
 class NequipModel(BaseModel):
@@ -243,6 +244,8 @@ class NequipModel(BaseModel):
     @torch.jit.export
     def get_rcut(self) -> float:
         """Get the cut-off radius."""
+        if env.DP_GNN_USE_MAPPING:
+            return self.rcut
         return self.rcut * self.num_layers
 
     @torch.jit.export
@@ -402,7 +405,14 @@ class NequipModel(BaseModel):
         nloc = nlist.shape[1]
         nf, nall = extended_atype.shape
         # recalculate nlist for ghost atoms
-        if self.num_layers > 1 and nloc < nall:
+        if mapping is None and self.num_layers > 1 and nloc < nall:
+            if env.DP_GNN_USE_MAPPING:
+                # when setting DP_GNN_USE_MAPPING, ghost atoms are only built
+                # for one message-passing layer
+                raise ValueError(
+                    "When setting DP_GNN_USE_MAPPING, mapping is required. "
+                    "If you are using LAMMPS, set `atom_modify map yes`."
+                )
             nlist = build_neighbor_list(
                 extended_coord.view(nf, -1),
                 extended_atype,
