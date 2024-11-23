@@ -89,10 +89,13 @@ However, this approach is very inefficient.
 
 The alternative approach is to use the mapping passed from LAMMPS, which only does not support MPI.
 One needs to set `DP_GNN_USE_MAPPING` when freezing the models,
+
 ```sh
 DP_GNN_USE_MAPPING=1 dp --pt freeze
 ```
+
 and request the mapping when using LAMMPS (also requires DeePMD-kit v3.0.0rc0 or above).
+
 ```lammps
 atom_modify map array
 ```

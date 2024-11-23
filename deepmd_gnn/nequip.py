@@ -48,6 +48,7 @@ from nequip.model import model_from_config
 
 from deepmd_gnn import env
 
+
 @BaseModel.register("nequip")
 class NequipModel(BaseModel):
     """Nequip model.
@@ -411,7 +412,7 @@ class NequipModel(BaseModel):
                 # for one message-passing layer
                 raise ValueError(
                     "When setting DP_GNN_USE_MAPPING, mapping is required. "
-                    "If you are using LAMMPS, set `atom_modify map yes`."
+                    "If you are using LAMMPS, set `atom_modify map yes`.",
                 )
             nlist = build_neighbor_list(
                 extended_coord.view(nf, -1),
