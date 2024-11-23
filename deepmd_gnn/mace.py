@@ -177,8 +177,8 @@ ELEMENTS = [
 ]
 
 PeriodicTable = {
-    **{ee: ii for ii, ee in enumerate(ELEMENTS)},
-    **{f"m{ee}": ii for ii, ee in enumerate(ELEMENTS)},
+    **{ee: ii + 1 for ii, ee in enumerate(ELEMENTS)},
+    **{f"m{ee}": ii + 1 for ii, ee in enumerate(ELEMENTS)},
     "HW": 1,
     "OW": 8,
 }
