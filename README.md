@@ -77,7 +77,7 @@ dp --pt freeze
 A frozen model file named `frozen_model.pth` will be generated. You can use it in the MD packages or other interfaces.
 For details, follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/).
 
-### Running LAMMPS with period boundry conditions
+### Running LAMMPS + MACE with period boundry conditions
 
 GNN models use message passing neural networks,
 so the neighbor list built with traditional cutoff radius will not work,
@@ -87,7 +87,7 @@ where $r_c$ is set by `r_max` and $N_L$ is set by `num_interactions` (MACE) / `n
 and rebuilds the neighbor list for ghost atoms.
 However, this approach is very inefficient.
 
-The alternative approach is to use the mapping passed from LAMMPS, which does not support MPI.
+The alternative approach for the MACE model (note: NequIP doesn't support such approach) is to use the mapping passed from LAMMPS, which does not support MPI.
 One needs to set `DP_GNN_USE_MAPPING` when freezing the models,
 
 ```sh
