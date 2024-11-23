@@ -407,7 +407,7 @@ class NequipModel(BaseModel):
         nf, nall = extended_atype.shape
         # recalculate nlist for ghost atoms
         if mapping is None and self.num_layers > 1 and nloc < nall:
-            if env.DP_GNN_USE_MAPPING:
+            if deepmd_gnn_env.DP_GNN_USE_MAPPING:
                 # when setting DP_GNN_USE_MAPPING, ghost atoms are only built
                 # for one message-passing layer
                 msg = (

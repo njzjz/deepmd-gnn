@@ -530,7 +530,7 @@ class MaceModel(BaseModel):
         nf, nall = extended_atype.shape
         # calculate nlist for ghost atoms, as LAMMPS does not calculate it
         if mapping is None and self.num_interactions > 1 and nloc < nall:
-            if env.DP_GNN_USE_MAPPING:
+            if deepmd_gnn_env.DP_GNN_USE_MAPPING:
                 # when setting DP_GNN_USE_MAPPING, ghost atoms are only built
                 # for one message-passing layer
                 msg = (
