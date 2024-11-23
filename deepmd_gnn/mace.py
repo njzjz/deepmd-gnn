@@ -535,7 +535,7 @@ class MaceModel(BaseModel):
                 # for one message-passing layer
                 msg = (
                     "When setting DP_GNN_USE_MAPPING, mapping is required. "
-                    "If you are using LAMMPS, set `atom_modify map yes`.",
+                    "If you are using LAMMPS, set `atom_modify map yes`."
                 )
                 raise ValueError(msg)
             nlist = build_neighbor_list(

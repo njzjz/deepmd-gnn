@@ -1,4 +1,4 @@
-"""Configurations read from environement variables."""
+"""Configurations read from environment variables."""
 
 import os
 

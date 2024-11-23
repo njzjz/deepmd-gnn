@@ -77,7 +77,7 @@ dp --pt freeze
 A frozen model file named `frozen_model.pth` will be generated. You can use it in the MD packages or other interfaces.
 For details, follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/).
 
-### Running LAMMPS + MACE with period boundry conditions
+### Running LAMMPS + MACE with period boundary conditions
 
 GNN models use message passing neural networks,
 so the neighbor list built with traditional cutoff radius will not work,
