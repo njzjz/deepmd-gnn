@@ -2,7 +2,7 @@ file(GLOB OP_SRC edge_index.cc)
 
 add_library(deepmd_gnn MODULE ${OP_SRC})
 # link: libdeepmd libtorch
-target_link_libraries(deepmd_gnn PRIVATE ${TORCH_LIBRARIES})
+target_include_directories(deepmd_gnn PRIVATE ${TORCH_INCLUDE_DIRS})
 target_compile_definitions(
   deepmd_gnn
   PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:_GLIBCXX_USE_CXX11_ABI=${OP_CXX_ABI_PT}>")
