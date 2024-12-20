@@ -25,7 +25,7 @@ We will update the credit information once it is published.
 First, clone this repository:
 
 ```sh
-git clone https://github.com/njzjz/deepmd-gnn
+git clone https://gitlab.com/RutgersLBSR/deepmd-gnn
 cd deepmd-gnn
 ```
 
