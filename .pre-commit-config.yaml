@@ -30,11 +30,6 @@ repos:
     hooks:
       - id: prettier
         types_or: [javascript, css, html, markdown, yaml]
-  - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.23
-    hooks:
-      - id: validate-pyproject
-        additional_dependencies: ["validate-pyproject-schema-store[all]"]
   # C++
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v19.1.4
