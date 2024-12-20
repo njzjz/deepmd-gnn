@@ -1,10 +1,9 @@
-name: Mirror to Gitee Repo
+name: Mirror to GitLab Repo
 
 on:
   push:
     branches:
       - master
-      - ci-mirror-gitlab  # for test
     tags:
       - v*
 
