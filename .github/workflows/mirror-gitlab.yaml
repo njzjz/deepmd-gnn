@@ -1,0 +1,25 @@
+name: Mirror to Gitee Repo
+
+on:
+  push:
+    branches:
+      - master
+      - ci-mirror-gitlab  # for test
+    tags:
+      - v*
+
+# Ensures that only one mirror task will run at a time.
+concurrency:
+  group: git-mirror
+
+jobs:
+  git-mirror:
+    if: github.repository_owner == 'njzjz'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: wearerequired/git-mirror-action@v1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SYNC_GITLAB_PRIVATE_KEY }}
+        with:
+          source-repo: "https://github.com/njzjz/deepmd-gnn"
+          destination-repo: "git@gitlab.com:RutgersLBSR/deepmd-gnn"
