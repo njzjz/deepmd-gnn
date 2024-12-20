@@ -43,7 +43,7 @@ mace = "deepmd_gnn.mace:MaceModel"
 nequip = "deepmd_gnn.nequip:NequipModel"
 
 [project.urls]
-repository = "https://github.com/njzjz/deepmd-gnn"
+repository = "https://gitlab.com/RutgersLBSR/deepmd-gnn"
 
 [project.optional-dependencies]
 test = [
