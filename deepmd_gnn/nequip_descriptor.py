@@ -237,10 +237,7 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
             if tuple(source[key].shape) != tuple(target[key].shape)
         ]
         if incompatible:
-            msg = (
-                "NequIP artifact backbone tensor shape mismatch for "
-                f"{incompatible}"
-            )
+            msg = f"NequIP artifact backbone tensor shape mismatch for {incompatible}"
             raise ValueError(msg)
         self.model.load_state_dict(source, strict=True)
 
@@ -407,9 +404,7 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
                 device=mapping.device,
             ).unsqueeze(-1).expand(nf, nall).reshape(-1)
             atom_shifts = coord_flat - coord_flat[mapping_flat]
-            shifts = (
-                atom_shifts[edge_index[1]] - atom_shifts[edge_index[0]]
-            )
+            shifts = atom_shifts[edge_index[1]] - atom_shifts[edge_index[0]]
             edge_index = mapping_flat[edge_index]
         batch = (
             torch.arange(nf, dtype=torch.int64, device=coord.device)

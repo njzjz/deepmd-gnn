@@ -1,6 +1,9 @@
 {
   "model": {
-    "type_map": ["O", "H"],
+    "type_map": [
+      "O",
+      "H"
+    ],
     "descriptor": {
       "type": "nequip",
       "sel": "auto",
@@ -11,7 +14,10 @@
       "type": "property",
       "property_name": "band_prop",
       "task_dim": 1,
-      "neuron": [64, 64],
+      "neuron": [
+        64,
+        64
+      ],
       "precision": "float32"
     }
   },
@@ -23,13 +29,17 @@
   },
   "loss": {
     "type": "property",
-    "metric": ["mae"],
+    "metric": [
+      "mae"
+    ],
     "loss_func": "smooth_mae",
     "beta": 1.0
   },
   "training": {
     "training_data": {
-      "systems": ["../../data/data_0"],
+      "systems": [
+        "../../data/data_0"
+      ],
       "batch_size": 1
     },
     "numb_steps": 100000,
