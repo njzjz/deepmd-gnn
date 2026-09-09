@@ -1,0 +1,39 @@
+{
+  "model": {
+    "type_map": ["O", "H"],
+    "descriptor": {
+      "type": "nequip",
+      "sel": "auto",
+      "model_file": "nequip_model.pt",
+      "trainable": true
+    },
+    "fitting_net": {
+      "type": "property",
+      "property_name": "band_prop",
+      "task_dim": 1,
+      "neuron": [64, 64],
+      "precision": "float32"
+    }
+  },
+  "learning_rate": {
+    "type": "exp",
+    "decay_steps": 5000,
+    "start_lr": 0.001,
+    "stop_lr": 1e-08
+  },
+  "loss": {
+    "type": "property",
+    "metric": ["mae"],
+    "loss_func": "smooth_mae",
+    "beta": 1.0
+  },
+  "training": {
+    "training_data": {
+      "systems": ["../../data/data_0"],
+      "batch_size": 1
+    },
+    "numb_steps": 100000,
+    "disp_freq": 100,
+    "save_freq": 1000
+  }
+}

@@ -339,3 +339,37 @@ def nequip_model_args() -> Argument:
         ],
         doc="Nequip model",
     )
+
+
+@descrpt_args_plugin.register("nequip")
+def nequip_descriptor_args() -> Argument:
+    """Arguments for the eager legacy NequIP descriptor."""
+    architecture = list(nequip_model_args().sub_fields.values())
+    return Argument(
+        "nequip",
+        dict,
+        [
+            *architecture,
+            Argument(
+                "model_file",
+                str,
+                optional=True,
+                default=None,
+                doc=(
+                    "Path to a trusted torch.save artifact containing "
+                    "NequipModel.serialize() output."
+                ),
+            ),
+            Argument(
+                "trainable",
+                bool,
+                optional=True,
+                default=True,
+                doc="Whether to train the NequIP backbone.",
+            ),
+        ],
+        doc=(
+            "PT-only invariant descriptor from legacy NequIP 0.5/0.6 "
+            "conv_to_output_hidden node features."
+        ),
+    )

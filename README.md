@@ -374,6 +374,53 @@ Below is default values for the MACE model, most of which follows default values
 }
 ```
 
+#### NequIP descriptor for property fitting
+
+The PyTorch backend can reuse the invariant node features immediately after a
+legacy NequIP `EnergyModel`'s `conv_to_output_hidden` layer as a standard
+DeePMD descriptor. This makes it composable with `PropertyFittingNet`, and both
+the NequIP convolutional backbone and the new property fitting head are
+trainable by default. The energy scalar readout and DeePMD `e0` statistics are
+not loaded into the property model.
+
+Create a trusted local artifact from a current DeePMD-GNN `NequipModel`:
+
+```python
+import torch
+from deepmd_gnn.nequip import NequipModel
+
+energy_model = NequipModel(type_map=["O", "H"], sel=64)
+torch.save(energy_model.serialize(), "nequip_model.pt")
+```
+
+Then use it in a standard descriptor/fitting configuration:
+
+```json
+"model": {
+  "type_map": ["O", "H"],
+  "descriptor": {
+    "type": "nequip",
+    "sel": "auto",
+    "model_file": "nequip_model.pt",
+    "trainable": true
+  },
+  "fitting_net": {
+    "type": "property",
+    "property_name": "band_prop",
+    "task_dim": 1
+  }
+}
+```
+
+See [`examples/property/nequip/input.json`](examples/property/nequip/input.json)
+for a complete input. Artifact loading is strict: the type map and every
+backbone tensor through `conv_to_output_hidden` must match. Only serialized
+`NequipModel.serialize()` payloads for the supported legacy NequIP 0.5/0.6
+architecture are accepted. These artifacts use Python pickle loading, so only
+load files from a trusted source. Native NequIP 0.7+ foundation checkpoints,
+SevenNet checkpoints, `pt_expt`, descriptor MPI communication, and descriptor
+deployment/LAMMPS are not supported by this path.
+
 ## DPRc support
 
 In `deepmd-gnn`, the GNN model can be used in a [DPRc](https://docs.deepmodeling.com/projects/deepmd/en/latest/model/dprc.html) way.
@@ -420,3 +467,4 @@ about (for example in LAMMPS or AMBER).
 - [examples/water](examples/water)
 - [examples/dprc](examples/dprc)
 - [examples/property/mace](examples/property/mace)
+- [examples/property/nequip](examples/property/nequip)
