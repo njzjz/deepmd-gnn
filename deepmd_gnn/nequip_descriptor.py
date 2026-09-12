@@ -236,6 +236,10 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         descriptor.model = script(descriptor.model)
         return descriptor
 
+    def has_default_chg_spin(self) -> bool:
+        """Declare absent charge/spin defaults for newer DeePMD model exports."""
+        return False
+
     def get_default_chg_spin(self) -> None:
         """Return a concrete TorchScript type for absent charge/spin defaults."""
         return None  # noqa: RET501
