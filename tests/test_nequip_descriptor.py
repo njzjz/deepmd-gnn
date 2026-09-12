@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -18,7 +19,7 @@ from nequip.data import AtomicDataDict
 from deepmd_gnn.nequip import NequipModel, _make_nequip_network
 from deepmd_gnn.nequip_descriptor import NequipDescriptor
 
-PARAMS = {
+PARAMS: dict[str, Any] = {
     "type_map": ["O", "H"],
     "sel": 8,
     "r_max": 3.0,
@@ -256,6 +257,29 @@ def test_readout_and_e0_do_not_enter_descriptor(
     )
 
 
+def test_property_model_is_torchscriptable(artifact: Path) -> None:
+    """Evaluation and freezing script the complete property model."""
+    model = get_model(
+        {
+            "type_map": PARAMS["type_map"],
+            "descriptor": {"type": "nequip", "sel": 8, "model_file": str(artifact)},
+            "fitting_net": {
+                "type": "property",
+                "property_name": "band_prop",
+                "task_dim": 1,
+                "neuron": [4],
+                "precision": "float32",
+            },
+        },
+    )
+    coord, atype, _ = _inputs()
+    scripted = torch.jit.script(model)
+    torch.testing.assert_close(
+        scripted(coord, atype)["band_prop"],
+        model(coord, atype)["band_prop"],
+    )
+
+
 def test_dp_train_property_updates_backbone(
     tmp_path: Path,
     artifact: Path,
@@ -347,3 +371,31 @@ def test_dp_train_property_updates_backbone(
             )
     assert changed
     assert any(changed)
+
+    # Trained checkpoints must remain usable after moving away from the
+    # original pretrained artifact, as happens when deploying or freezing.
+    artifact.unlink()
+    from deepmd.pt.infer.inference import Tester  # noqa: PLC0415
+
+    tester = Tester(str(tmp_path / "model.ckpt-2.pt"))
+    coord, atype, _ = _inputs()
+    prediction, _, _ = tester.wrapper(coord.reshape(1, -1), atype)
+    assert torch.isfinite(prediction["band_prop"]).all()
+
+    subprocess.run(
+        [
+            str(dp),
+            "--pt",
+            "train",
+            str(input_file),
+            "--init-model",
+            str(tmp_path / "model.ckpt-2.pt"),
+            "--use-pretrain-script",
+        ],
+        cwd=tmp_path,
+        env=env_vars,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )

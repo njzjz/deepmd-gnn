@@ -361,6 +361,16 @@ def nequip_descriptor_args() -> Argument:
                 ),
             ),
             Argument(
+                "config",
+                dict,
+                optional=True,
+                default=None,
+                doc=(
+                    "Inferred backbone architecture saved during training so "
+                    "checkpoints can restore without the source artifact."
+                ),
+            ),
+            Argument(
                 "trainable",
                 bool,
                 optional=True,

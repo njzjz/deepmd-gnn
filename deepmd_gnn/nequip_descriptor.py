@@ -3,6 +3,7 @@
 
 from collections import OrderedDict
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from deepmd.utils.data_system import DeepmdDataSystem
 from deepmd.utils.path import DPPath
 from deepmd.utils.version import check_version_compatibility
 from e3nn import o3
+from e3nn.util.jit import script
 from nequip.data import AtomicDataDict
 from nequip.nn import GraphModel, SequentialGraphNetwork
 
@@ -100,6 +102,8 @@ def _make_nequip_backbone(
 class NequipDescriptor(BaseDescriptor, torch.nn.Module):
     """Legacy NequIP 0.5/0.6 invariant features for standard DeePMD fittings."""
 
+    mm_types: list[int]
+
     def __init__(
         self,
         sel: int,
@@ -122,6 +126,7 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         precision: str = "float32",
         trainable: bool = True,
         model_file: str | None = None,
+        config: dict[str, Any] | None = None,
         ntypes: int | None = None,
         type_map: list[str] | None = None,
         **kwargs: Any,  # noqa: ANN401
@@ -139,7 +144,7 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         if ntypes is not None and ntypes != len(type_map):
             msg = "ntypes does not match the descriptor type_map"
             raise ValueError(msg)
-        params = {
+        params: dict[str, Any] = {
             "type_map": list(type_map),
             "sel": sel,
             "r_max": r_max,
@@ -161,7 +166,15 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
             "precision": precision,
         }
         payload = None
-        if model_file is not None:
+        # Training saves this architecture in the model definition. Once the
+        # original artifact is absent, checkpoint weights restore the backbone
+        # built from that definition instead of reopening an external file.
+        if config is not None:
+            params = deepcopy(config)
+            if params.get("type_map") != type_map:
+                msg = "Saved NequIP config type_map does not match descriptor type_map"
+                raise ValueError(msg)
+        if model_file is not None and (config is None or Path(model_file).is_file()):
             payload = _load_serialized_nequip(model_file)
             artifact_params = _artifact_params(payload)
             artifact_type_map = artifact_params.get("type_map")
@@ -211,6 +224,21 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         for parameter in self.parameters():
             parameter.requires_grad_(trainable)
         self.trainable = trainable
+
+    def __prepare_scriptable__(self) -> "NequipDescriptor":
+        """Compile e3nn's traced submodules while keeping the training model eager.
+
+        Legacy e3nn activations require its tracing-aware compiler before the
+        complete DeePMD property model can be passed to ``torch.jit.script``.
+        A copy preserves the caller's trainable modules and parameter identity.
+        """
+        descriptor = deepcopy(self)
+        descriptor.model = script(descriptor.model)
+        return descriptor
+
+    def get_default_chg_spin(self) -> None:
+        """Return a concrete TorchScript type for absent charge/spin defaults."""
+        return None  # noqa: RET501
 
     def _load_backbone_variables(self, variables: dict[str, Any]) -> None:
         target = self.model.state_dict()
@@ -475,10 +503,18 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         """Update the mixed-type neighbor selection."""
         local_jdata = local_jdata.copy()
         model_file = local_jdata.get("model_file")
-        if model_file is not None:
+        if model_file is not None and (
+            local_jdata.get("config") is None or Path(model_file).is_file()
+        ):
             artifact = _artifact_params(_load_serialized_nequip(model_file))
             local_jdata["r_max"] = artifact["r_max"]
             local_jdata["sel"] = artifact["sel"]
+            local_jdata["config"] = artifact
+        elif local_jdata.get("config") is not None:
+            # --init-model --use-pretrain-script runs neighbor statistics on
+            # the saved definition before loading checkpoint weights.
+            local_jdata["r_max"] = local_jdata["config"]["r_max"]
+            local_jdata["sel"] = local_jdata["config"]["sel"]
         rcut = local_jdata.get("r_max", 6.0)
         min_dist, sel = UpdateSel().update_one_sel(
             train_data,
