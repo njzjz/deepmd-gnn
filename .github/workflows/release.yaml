@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi_publish
-      url: https://pypi.org/p/python-template
+      url: https://pypi.org/p/deepmd-gnn
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
       - release-build
