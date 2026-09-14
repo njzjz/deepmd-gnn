@@ -66,6 +66,7 @@ html_extra_path = ["report.html", "fire.png", "bundle.js", "bundle.css"]
 
 html_theme_options = {
     "github_url": "https://github.com/deepmodeling/deepmd-gnn",
+    "gitlab_url": "https://gitlab.com/RutgersLBSR/deepmd-gnn",
     "logo": {
         "text": "DeePMD-GNN",
         "alt_text": "DeePMD-GNN",
