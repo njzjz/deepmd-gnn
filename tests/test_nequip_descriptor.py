@@ -6,7 +6,9 @@ import json
 import os
 import subprocess
 import sys
+from collections import OrderedDict
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -17,7 +19,11 @@ from deepmd.pt.utils.nlist import extend_input_and_build_neighbor_list
 from nequip.data import AtomicDataDict
 
 from deepmd_gnn.nequip import NequipModel, _make_nequip_network
-from deepmd_gnn.nequip_descriptor import NequipDescriptor
+from deepmd_gnn.nequip_descriptor import (
+    NequipDescriptor,
+    _load_serialized_nequip,
+    _make_nequip_backbone,
+)
 
 PARAMS: dict[str, Any] = {
     "type_map": ["O", "H"],
@@ -63,13 +69,26 @@ def test_metadata_and_strict_pretrained_mapping(
     descriptor: NequipDescriptor,
 ) -> None:
     assert descriptor.get_dim_out() == 3
+    assert descriptor.get_dim_emb() == 3
     assert descriptor.get_sel() == [8]
+    assert descriptor.get_nsel() == 8
+    assert descriptor.get_ntypes() == 2
+    assert descriptor.get_type_map() == ["O", "H"]
     assert descriptor.get_rcut() == 3.0
+    assert descriptor.get_rcut_smth() == 3.0
+    assert descriptor.get_env_protection() == 0.0
     assert descriptor.mixed_types()
     assert descriptor.has_message_passing()
     assert not descriptor.has_message_passing_across_ranks()
     assert not descriptor.supports_edge_parallel()
     assert not descriptor.dense_lower_supports_comm()
+    assert not descriptor.need_sorted_nlist_for_lower()
+    assert descriptor.has_default_chg_spin() is False
+    assert descriptor.get_default_chg_spin() is None
+    descriptor.compute_input_stats([])
+    assert descriptor.get_stats() == {}
+    descriptor.set_stat_mean_and_stddev(torch.ones(1), torch.ones(1))
+    assert descriptor.get_stat_mean_and_stddev() == (None, None)
     assert all(parameter.requires_grad for parameter in descriptor.parameters())
 
     payload = torch.load(artifact, weights_only=False)
@@ -93,6 +112,43 @@ def test_metadata_and_strict_pretrained_mapping(
             model_file=str(artifact),
             num_layers=3,
         )
+    with pytest.raises(ValueError, match="sel"):
+        NequipDescriptor(
+            sel=16,
+            type_map=["O", "H"],
+            model_file=str(artifact),
+        )
+    with pytest.raises(TypeError, match="Unsupported NequIP descriptor arguments"):
+        NequipDescriptor(sel=8, type_map=["O", "H"], unknown=True)
+    with pytest.raises(ValueError, match="requires type_map"):
+        NequipDescriptor(sel=8)
+    with pytest.raises(ValueError, match="ntypes does not match"):
+        NequipDescriptor(sel=8, type_map=["O", "H"], ntypes=3)
+    with pytest.raises(ValueError, match="Saved NequIP config type_map"):
+        NequipDescriptor(
+            sel=8,
+            type_map=["O", "H"],
+            config={**descriptor.params, "type_map": ["H", "O"]},
+        )
+
+    from_ntypes = NequipDescriptor(
+        sel=8,
+        ntypes=2,
+        r_max=3.0,
+        num_layers=2,
+        l_max=1,
+        num_features=4,
+        feature_irreps_hidden="4x0e + 4x1o",
+        chemical_embedding_irreps_out="4x0e",
+        conv_to_output_hidden_irreps_out="3x0e",
+    )
+    assert from_ntypes.get_type_map() == ["0", "1"]
+    restored = NequipDescriptor(
+        sel=descriptor.sel,
+        type_map=descriptor.type_map,
+        config=descriptor.params,
+    )
+    assert restored.get_dim_out() == descriptor.get_dim_out()
 
 
 def test_features_match_original_graph(
@@ -399,3 +455,148 @@ def test_dp_train_property_updates_backbone(
         text=True,
         timeout=120,
     )
+
+
+def test_serialized_artifact_must_be_a_nequip_model(tmp_path: Path) -> None:
+    not_a_dict = tmp_path / "list.pt"
+    torch.save([1, 2], not_a_dict)
+    with pytest.raises(TypeError, match="dictionary"):
+        _load_serialized_nequip(str(not_a_dict))
+
+    wrong_class = tmp_path / "wrong_class.pt"
+    torch.save(
+        {"@class": "Descriptor", "type": "nequip", "@variables": {}},
+        wrong_class,
+    )
+    with pytest.raises(ValueError, match="serialized NequipModel"):
+        _load_serialized_nequip(str(wrong_class))
+
+    missing_variables = tmp_path / "no_vars.pt"
+    torch.save({"@class": "Model", "type": "nequip"}, missing_variables)
+    with pytest.raises(ValueError, match="no @variables"):
+        _load_serialized_nequip(str(missing_variables))
+
+
+def test_backbone_requires_invariant_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_network(modules: OrderedDict) -> SimpleNamespace:
+        return SimpleNamespace(model=SimpleNamespace(_modules=modules))
+
+    monkeypatch.setattr(
+        "deepmd_gnn.nequip_descriptor._make_nequip_network",
+        lambda *_args, **_kwargs: fake_network(OrderedDict()),
+    )
+    with pytest.raises(ValueError, match="conv_to_output_hidden"):
+        _make_nequip_backbone(PARAMS, 2)
+
+    monkeypatch.setattr(
+        "deepmd_gnn.nequip_descriptor._make_nequip_network",
+        lambda *_args, **_kwargs: fake_network(
+            OrderedDict(
+                conv_to_output_hidden=SimpleNamespace(irreps_out={}),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="does not declare node feature irreps"):
+        _make_nequip_backbone(PARAMS, 2)
+
+    monkeypatch.setattr(
+        "deepmd_gnn.nequip_descriptor._make_nequip_network",
+        lambda *_args, **_kwargs: fake_network(
+            OrderedDict(
+                conv_to_output_hidden=SimpleNamespace(
+                    irreps_out={AtomicDataDict.NODE_FEATURES_KEY: "2x1o"},
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="pure invariant 0e"):
+        _make_nequip_backbone(PARAMS, 2)
+
+
+def test_backbone_variable_shape_mismatch(artifact: Path) -> None:
+    payload = torch.load(artifact, weights_only=False)
+    payload["@variables"]["model.conv_to_output_hidden.linear.weight"] = np.zeros(
+        (1, 1),
+    )
+    broken = artifact.with_name("shape.pt")
+    torch.save(payload, broken)
+    with pytest.raises(ValueError, match="tensor shape mismatch"):
+        NequipDescriptor(
+            sel=8,
+            type_map=["O", "H"],
+            model_file=str(broken),
+        )
+
+
+def test_share_params_and_reject_type_map_change(
+    artifact: Path,
+    descriptor: NequipDescriptor,
+) -> None:
+    peer = NequipDescriptor(
+        sel=PARAMS["sel"],
+        type_map=PARAMS["type_map"],
+        model_file=str(artifact),
+    )
+    peer.share_params(descriptor, 0)
+    assert peer.model is descriptor.model
+    with pytest.raises(TypeError, match="can only share"):
+        descriptor.share_params(object(), 0)
+    with pytest.raises(NotImplementedError, match="full sharing"):
+        descriptor.share_params(peer, 1)
+    peer.params = {**peer.params, "sel": 999}
+    with pytest.raises(ValueError, match="matching configs"):
+        descriptor.share_params(peer, 0)
+    with pytest.raises(NotImplementedError, match="changing type_map"):
+        descriptor.change_type_map(["H", "O"])
+
+
+def test_forward_rejects_communication_and_aux_inputs(
+    descriptor: NequipDescriptor,
+) -> None:
+    coord, atype, nlist = _inputs()
+    with pytest.raises(NotImplementedError, match="MPI communication"):
+        descriptor(coord, atype, nlist, comm_dict={"rank": torch.tensor(0)})
+    with pytest.raises(ValueError, match="auxiliary inputs"):
+        descriptor(coord, atype, nlist, fparam=torch.zeros(1))
+    with pytest.raises(ValueError, match="auxiliary inputs"):
+        descriptor(coord, atype, nlist, charge_spin=torch.zeros(1))
+
+
+def test_update_sel_uses_artifact_or_saved_config(
+    artifact: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "deepmd_gnn.nequip_descriptor.UpdateSel.update_one_sel",
+        lambda *_args, **_kwargs: (0.4, [8]),
+    )
+    updated, min_dist = NequipDescriptor.update_sel(
+        None,
+        ["O", "H"],
+        {"type": "nequip", "sel": 8, "model_file": str(artifact)},
+    )
+    assert min_dist == 0.4
+    assert updated["r_max"] == 3.0
+    assert updated["sel"] == 8
+    assert updated["config"]["type_map"] == ["O", "H"]
+
+    restored, _ = NequipDescriptor.update_sel(
+        None,
+        ["O", "H"],
+        {
+            "sel": 8,
+            "model_file": str(artifact.parent / "missing.pt"),
+            "config": updated["config"],
+        },
+    )
+    assert restored["r_max"] == 3.0
+    assert restored["sel"] == 8
+
+    plain, _ = NequipDescriptor.update_sel(
+        None,
+        ["O", "H"],
+        {"sel": 8, "r_max": 3.0},
+    )
+    assert plain["sel"] == 8
