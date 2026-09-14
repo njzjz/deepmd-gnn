@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'deepmodeling' && github.event.label.name == 'Test CUDA'
     steps:
-      - uses: actions-ecosystem/action-remove-labels@v1
-        with:
-          labels: Test CUDA
-          number: ${{ github.event.pull_request.number }}
+      - name: Remove Test CUDA label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --method DELETE "repos/${GH_REPO}/issues/${PR_NUMBER}/labels/Test%20CUDA"
