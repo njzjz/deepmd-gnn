@@ -16,14 +16,18 @@ def _register() -> None:
     if _is_partially_initialized(
         "deepmd_gnn.mace",
         "MaceModel",
-    ) or _is_partially_initialized("deepmd_gnn.nequip", "NequipModel"):
+    ) or _is_partially_initialized(
+        "deepmd_gnn.nequip",
+        "NequipModel",
+    ):
         return
 
     from deepmd.pt.model.model.model import (  # noqa: PLC0415
         BaseModel as PyTorchBaseModel,
     )
 
-    import deepmd_gnn.mace_descriptor  # noqa: F401, PLC0415
+    import deepmd_gnn.mace_descriptor  # noqa: PLC0415
+    import deepmd_gnn.nequip_descriptor  # noqa: F401, PLC0415
     from deepmd_gnn.mace import MaceModel  # noqa: PLC0415
     from deepmd_gnn.nequip import NequipModel  # noqa: PLC0415
 
