@@ -55,7 +55,16 @@ EdgeIndexShape validate_shape(const ts::Tensor& nlist_tensor,
   } else {
     throw std::invalid_argument("nlist_tensor must be 2D or 3D");
   }
+  if (shape.nloc > shape.nall) {
+    throw std::invalid_argument("nloc must not exceed nall");
+  }
   return shape;
+}
+
+void validate_mm_tensor(const ts::Tensor& mm_tensor) {
+  if (mm_tensor.dim() != 1) {
+    throw std::invalid_argument("mm_tensor must be 1D");
+  }
 }
 
 ts::Tensor to_device_contiguous(const ts::Tensor& tensor,
@@ -88,10 +97,12 @@ void visit_edges(const EdgeIndexShape& shape,
       for (int64_t jj = 0; jj < shape.nnei; jj++) {
         const int64_t idx = ff * shape.nloc * shape.nnei + ii * shape.nnei + jj;
         const int64_t kk = nlist[idx];
-        const int64_t safe_kk = std::max<int64_t>(kk, 0);
+        const bool valid_neighbor = kk >= 0 && kk < shape.nall;
+        // Dense output still needs a safe placeholder for masked-out slots.
+        const int64_t safe_kk = valid_neighbor ? kk : 0;
         const int64_t global_kk = ff * shape.nall + safe_kk;
         const int64_t global_ii = ff * shape.nall + ii;
-        bool valid = kk >= 0;
+        bool valid = valid_neighbor;
         if (valid && nmm > 0) {
           const bool in_mm1 = type_in_mm(atype[global_ii], mm, nmm);
           const bool in_mm2 = type_in_mm(atype[global_kk], mm, nmm);
@@ -111,6 +122,7 @@ ts::Tensor edge_index_cpu_kernel(const ts::Tensor& nlist_tensor,
   ts::Tensor mm_tensor_ = to_cpu_contiguous(mm_tensor);
 
   const EdgeIndexShape shape = validate_shape(nlist_tensor_, atype_tensor_);
+  validate_mm_tensor(mm_tensor_);
   const int64_t nmm = mm_tensor_.size(0);
   const int64_t* nlist = nlist_tensor_.const_data_ptr<int64_t>();
   const int64_t* atype = atype_tensor_.const_data_ptr<int64_t>();
@@ -147,6 +159,7 @@ ts::Tensor edge_index_cuda_kernel(const ts::Tensor& nlist_tensor,
   ts::Tensor mm_tensor_ = to_device_contiguous(mm_tensor, device);
 
   const EdgeIndexShape shape = validate_shape(nlist_tensor_, atype_tensor_);
+  validate_mm_tensor(mm_tensor_);
   const int64_t nmm = mm_tensor_.size(0);
   const int64_t max_edge_size = shape.nf * shape.nloc * shape.nnei;
   ts::Tensor edge_index_tensor = ts::empty(
@@ -182,6 +195,7 @@ std::tuple<ts::Tensor, ts::Tensor> dense_edge_index_kernel(
   ts::Tensor mm_tensor_ = to_cpu_contiguous(mm_tensor);
 
   const EdgeIndexShape shape = validate_shape(nlist_tensor_, atype_tensor_);
+  validate_mm_tensor(mm_tensor_);
   const int64_t nmm = mm_tensor_.size(0);
   const int64_t* nlist = nlist_tensor_.const_data_ptr<int64_t>();
   const int64_t* atype = atype_tensor_.const_data_ptr<int64_t>();

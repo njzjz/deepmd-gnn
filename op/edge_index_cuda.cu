@@ -50,7 +50,7 @@ __device__ bool keep_edge(const int64_t* __restrict__ nlist,
   const int64_t local = tid % (nloc * nnei);
   const int64_t ii = local / nnei;
   const int64_t kk = nlist[tid];
-  if (kk < 0) {
+  if (kk < 0 || kk >= nall) {
     return false;
   }
 

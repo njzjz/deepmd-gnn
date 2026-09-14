@@ -185,3 +185,48 @@ def test_fake_dense_edge_index_rejects_invalid_rank() -> None:
 
     with pytest.raises(ValueError, match="nlist must be 2D or 3D"):
         _fake_dense_edge_index(nlist, atype, mm_types)
+
+
+@pytest.mark.parametrize(
+    ("nlist", "atype", "mm_types", "message"),
+    [
+        (
+            torch.zeros((3, 1), dtype=torch.int64),
+            torch.zeros((2,), dtype=torch.int64),
+            torch.empty((0,), dtype=torch.int64),
+            "nloc must not exceed nall",
+        ),
+        (
+            torch.zeros((2, 1), dtype=torch.int64),
+            torch.zeros((2,), dtype=torch.int64),
+            torch.empty((1, 1), dtype=torch.int64),
+            "mm_tensor must be 1D",
+        ),
+    ],
+)
+def test_edge_index_rejects_invalid_shapes(
+    nlist: torch.Tensor,
+    atype: torch.Tensor,
+    mm_types: torch.Tensor,
+    message: str,
+) -> None:
+    """Native edge-index entry points should reject unsafe tensor shapes."""
+    with pytest.raises((RuntimeError, ValueError), match=message):
+        torch.ops.deepmd_gnn.edge_index(nlist, atype, mm_types)
+    with pytest.raises((RuntimeError, ValueError), match=message):
+        torch.ops.deepmd_gnn.dense_edge_index(nlist, atype, mm_types)
+
+
+def test_out_of_range_neighbors_are_masked() -> None:
+    """Non-negative neighbor indices beyond nall must never be dereferenced."""
+    nlist = torch.tensor([[1, 2, -1], [0, -1, -1]], dtype=torch.int64)
+    atype = torch.tensor([0, 1], dtype=torch.int64)
+    mm_types = torch.empty((0,), dtype=torch.int64)
+    expected = torch.tensor([[1, 0], [0, 1]], dtype=torch.int64)
+
+    sparse = torch.ops.deepmd_gnn.edge_index(nlist, atype, mm_types)
+    dense, mask = torch.ops.deepmd_gnn.dense_edge_index(nlist, atype, mm_types)
+
+    assert torch.equal(sparse, expected)
+    assert torch.equal(dense[mask], expected)
+    assert mask.tolist() == [True, False, False, True, False, False]
