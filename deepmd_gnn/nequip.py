@@ -559,7 +559,7 @@ class NequipModel(BaseModel):
             model_predict["atom_virial"] = model_ret_lower["energy_derv_c"][
                 :,
                 :nloc,
-            ].squeeze(-3)
+            ].squeeze(-2)
         return model_predict
 
     @torch.jit.export
@@ -628,7 +628,7 @@ class NequipModel(BaseModel):
         model_predict["extended_force"] = model_ret["energy_derv_r"].squeeze(-2)
         model_predict["virial"] = model_ret["energy_derv_c_redu"].squeeze(-2)
         if do_atomic_virial:
-            model_predict["extended_virial"] = model_ret["energy_derv_c"].squeeze(-3)
+            model_predict["extended_virial"] = model_ret["energy_derv_c"].squeeze(-2)
         return model_predict
 
     def forward_lower_common(
@@ -1104,7 +1104,7 @@ class NequipModel(BaseModel):
         output_def["virial"] = deepcopy(out_def_data["energy_derv_c_redu"])
         output_def["virial"].squeeze(-2)
         output_def["atom_virial"] = deepcopy(out_def_data["energy_derv_c"])
-        output_def["atom_virial"].squeeze(-3)
+        output_def["atom_virial"].squeeze(-2)
         if "mask" in out_def_data:
             output_def["mask"] = deepcopy(out_def_data["mask"])
         return output_def

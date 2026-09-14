@@ -385,6 +385,7 @@ class ModelTestCase:
             np.testing.assert_allclose(rr1, rr2, atol=aprec)
         if do_atomic_virial:
             for rr in ret:
+                assert rr["atom_virial"].shape == (nf, natoms, 9)
                 np.testing.assert_allclose(
                     rr["atom_virial"].sum(axis=1).reshape(rr["virial"].shape),
                     rr["virial"],
@@ -392,6 +393,11 @@ class ModelTestCase:
                     err_msg="compare atom_virial sum and virial",
                 )
             for rr in ret_lower:
+                assert rr["extended_virial"].shape == (
+                    nf,
+                    atype_ext_large.shape[1],
+                    9,
+                )
                 np.testing.assert_allclose(
                     rr["extended_virial"].sum(axis=1).reshape(rr["virial"].shape),
                     rr["virial"],
