@@ -10,6 +10,7 @@ back to e3nn weights when DeePMD freezes an exportable model.
 from __future__ import annotations
 
 import importlib
+import inspect
 import warnings
 from collections.abc import MutableMapping
 from typing import Any
@@ -20,6 +21,7 @@ from deepmd.pt.utils import env
 from e3nn import o3
 from e3nn.util.jit import script
 from mace.modules import (
+    MACE,
     ScaleShiftMACE,
     gate_dict,
     interaction_classes,
@@ -100,6 +102,7 @@ def make_mace_network(
     num_cutoff_basis: int,
     max_ell: int,
     interaction: str,
+    interaction_first: str = "RealAgnosticInteractionBlock",
     num_interactions: int,
     num_elements: int,
     hidden_irreps: str,
@@ -107,7 +110,7 @@ def make_mace_network(
     avg_num_neighbors: float,
     pair_repulsion: bool,
     distance_transform: str,
-    correlation: int,
+    correlation: int | list[int],
     gate: str,
     MLP_irreps: str,
     std: float,
@@ -115,6 +118,16 @@ def make_mace_network(
     radial_type: str,
     enable_cueq: bool,
     script_model: bool,
+    keep_last_layer_irreps: bool = False,
+    heads: list[str] | None = None,
+    apply_cutoff: bool = True,
+    use_reduced_cg: bool = True,
+    use_so3: bool = False,
+    use_agnostic_product: bool = False,
+    use_last_readout_only: bool = False,
+    use_embedding_readout: bool = False,
+    edge_irreps: str | None = None,
+    use_edge_irreps_first: bool = False,
 ) -> torch.nn.Module:
     """Create a configured MACE subnetwork for DeePMD-GNN."""
     optimization_defaults = None
@@ -122,29 +135,62 @@ def make_mace_network(
         optimization_defaults = e3nn.get_optimization_defaults()
         e3nn.set_optimization_defaults(jit_script_fx=False)
     try:
+        atomic_energies = (
+            torch.zeros(num_elements)
+            if heads is None
+            else torch.zeros((len(heads), num_elements))
+        )
+        optional_values = {
+            "apply_cutoff": (apply_cutoff, True),
+            "use_reduced_cg": (use_reduced_cg, True),
+            "use_so3": (use_so3, False),
+            "use_agnostic_product": (use_agnostic_product, False),
+            "use_last_readout_only": (use_last_readout_only, False),
+            "use_embedding_readout": (use_embedding_readout, False),
+            "edge_irreps": (
+                None if edge_irreps is None else o3.Irreps(edge_irreps),
+                None,
+            ),
+            "use_edge_irreps_first": (use_edge_irreps_first, False),
+            "heads": (heads, None),
+            "keep_last_layer_irreps": (keep_last_layer_irreps, False),
+        }
+        constructor_parameters = inspect.signature(MACE.__init__).parameters
+        optional_kwargs: dict[str, Any] = {}
+        for name, (value, default) in optional_values.items():
+            if name in constructor_parameters:
+                optional_kwargs[name] = value
+            elif value != default and not (name == "heads" and value == ["Default"]):
+                msg = (
+                    f"Installed MACE does not support checkpoint option "
+                    f"{name}={value!r}"
+                )
+                raise ValueError(msg)
+
         model = ScaleShiftMACE(
             r_max=r_max,
             num_bessel=num_radial_basis,
             num_polynomial_cutoff=num_cutoff_basis,
             max_ell=max_ell,
             interaction_cls=interaction_classes[interaction],
+            interaction_cls_first=interaction_classes[interaction_first],
             num_interactions=num_interactions,
             num_elements=num_elements,
             hidden_irreps=o3.Irreps(hidden_irreps),
-            atomic_energies=torch.zeros(num_elements),  # pylint: disable=no-explicit-device,no-explicit-dtype
+            atomic_energies=atomic_energies,  # pylint: disable=no-explicit-device,no-explicit-dtype
             avg_num_neighbors=avg_num_neighbors,
             atomic_numbers=atomic_numbers,
             pair_repulsion=pair_repulsion,
             distance_transform=distance_transform,
             correlation=correlation,
             gate=gate_dict[gate],
-            interaction_cls_first=interaction_classes["RealAgnosticInteractionBlock"],
             MLP_irreps=o3.Irreps(MLP_irreps),
             atomic_inter_scale=std,
             atomic_inter_shift=0.0,
             radial_MLP=radial_MLP,
             radial_type=radial_type,
             cueq_config=make_cueq_config(enable_cueq),
+            **optional_kwargs,
         ).to(env.DEVICE)
     finally:
         if optimization_defaults is not None:
