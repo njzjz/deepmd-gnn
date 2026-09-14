@@ -11,6 +11,7 @@ Supported packages and models include:
 
 - [MACE](https://github.com/ACEsuit/mace) (PyTorch version)
 - [NequIP](https://github.com/mir-group/nequip) (PyTorch version)
+- [SevenNet](https://github.com/MDIL-SNU/SevenNet) (property descriptor, optional extra)
 
 After [installing the plugin](#installation), you can train the GNN models using DeePMD-kit, run active learning cycles for the GNN models using [DP-GEN](https://github.com/deepmodeling/dpgen), and perform simulations with MACE and NequIP models using molecular dynamic packages supported by DeePMD-kit, such as [LAMMPS](https://github.com/lammps/lammps) and [AMBER](https://ambermd.org/).
 You can follow [DeePMD-kit documentation](https://docs.deepmodeling.com/projects/deepmd/en/latest/) to train the GNN models using its PyTorch backend, after using the specific [model parameters](#parameters).
@@ -427,6 +428,46 @@ load files from a trusted source. Native NequIP 0.7+ foundation checkpoints,
 SevenNet checkpoints, `pt_expt`, descriptor MPI communication, and descriptor
 deployment/LAMMPS are not supported by this path.
 
+### SevenNet property descriptor
+
+SevenNet is wired as a **property descriptor**, not as a standalone energy model
+for LAMMPS/MPI. The backbone stays trainable and is composed with DeePMD-kit's
+standard `PropertyFittingNet`. Install the optional extra first:
+
+```sh
+pip install "deepmd-gnn[sevennet]"
+```
+
+SevenNet 0.11+ requires `e3nn>=0.5`. That can conflict with MACE stacks that
+still pin `e3nn` 0.4; use a separate environment when you need both.
+
+This path supports single-task checkpoints such as `7net-0`, `7net-l3i5`, and
+`7net-omat` (a local `.pth` or a SevenNet pretrained keyword). It does **not**
+support Omni/multi-fidelity modal heads, cuEquivariance, FlashTP,
+OpenEquivariance, or SevenNet's LAMMPS/MLIAP plugins. `type_map` must match the
+checkpoint `chemical_species` list exactly, including unused elements.
+
+```json
+"model": {
+  "type": "standard",
+  "type_map": ["H", "O"],
+  "descriptor": {
+    "type": "sevennet",
+    "model_path": "./trusted_single_task_sevennet.pth",
+    "sel": 64,
+    "trainable": true
+  },
+  "fitting_net": {
+    "type": "property",
+    "property_name": "band_gap",
+    "task_dim": 1,
+    "neuron": [128, 128]
+  }
+}
+```
+
+An example input is under [examples/property/sevennet](examples/property/sevennet).
+
 ## DPRc support
 
 In `deepmd-gnn`, the GNN model can be used in a [DPRc](https://docs.deepmodeling.com/projects/deepmd/en/latest/model/dprc.html) way.
@@ -474,3 +515,4 @@ about (for example in LAMMPS or AMBER).
 - [examples/dprc](examples/dprc)
 - [examples/property/mace](examples/property/mace)
 - [examples/property/nequip](examples/property/nequip)
+- [examples/property/sevennet](examples/property/sevennet)

@@ -1,5 +1,6 @@
 """PyTorch backend plugin registration."""
 
+import contextlib
 import sys
 
 
@@ -27,7 +28,10 @@ def _register() -> None:
     )
 
     import deepmd_gnn.mace_descriptor  # noqa: PLC0415
-    import deepmd_gnn.nequip_descriptor  # noqa: F401, PLC0415
+    import deepmd_gnn.nequip_descriptor  # noqa: PLC0415
+
+    with contextlib.suppress(ImportError):
+        import deepmd_gnn.sevennet_descriptor  # noqa: F401, PLC0415
     from deepmd_gnn.mace import MaceModel  # noqa: PLC0415
     from deepmd_gnn.nequip import NequipModel  # noqa: PLC0415
 
