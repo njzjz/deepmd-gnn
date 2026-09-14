@@ -111,8 +111,10 @@ select = [
     "ALL",
 ]
 ignore = [
+    "CPY001", # Licensing is declared with SPDX identifiers and the project LICENSE.
     "PLR0912",
     "PLR0913", # Too many arguments in function definition
+    "PLR0917", # DeePMD/Torch interfaces require positional-compatible signatures.
     "PLR0915",
     "PLR2004",
     "FBT001",
