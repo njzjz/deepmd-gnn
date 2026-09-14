@@ -16,13 +16,15 @@ repos:
       - id: mixed-line-ending
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.16.6
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
+        # Ruff 0.16+ includes Markdown by default; keep Markdown owned by mdformat.
+        types_or: [python, pyi, jupyter]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v2.1.0"
+    rev: "v2.3.1"
     hooks:
       - id: mypy
         additional_dependencies: []
@@ -47,7 +49,7 @@ repos:
         types_or: [yaml, css]
   # C++
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v22.1.5
+    rev: v23.1.0
     hooks:
       - id: clang-format
   # CMake

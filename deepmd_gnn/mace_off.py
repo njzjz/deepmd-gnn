@@ -27,8 +27,6 @@ if TYPE_CHECKING:
 
     from deepmd_gnn.mace import MaceModel
 
-_ALLOWED_MISSING_STATE_DICT_SUFFIXES = ("_zeroed",)
-
 _SUPPORTED_DISTANCE_TRANSFORMS = {
     None: "None",
     "AgnesiTransform": "Agnesi",
@@ -58,6 +56,7 @@ class _InferredMaceConfig(TypedDict):
     radial_MLP: list[int]
     std: float
     avg_num_neighbors: float
+    keep_last_layer_irreps: bool
 
 
 @lru_cache(maxsize=1)
@@ -88,12 +87,13 @@ def _load_e3nn_script() -> Callable[[torch.nn.Module], torch.nn.Module]:
 
 @contextmanager
 def _temporary_default_dtype(dtype: torch.dtype) -> Iterator[None]:
-    old_dtype = torch.get_default_dtype()
-    torch.set_default_dtype(dtype)
-    try:
+    """Compatibility alias for the generic checkpoint construction helper."""
+    from deepmd_gnn.mace_checkpoint import (  # noqa: PLC0415
+        temporary_default_dtype,
+    )
+
+    with temporary_default_dtype(dtype):
         yield
-    finally:
-        torch.set_default_dtype(old_dtype)
 
 
 def _validate_atomic_numbers(atomic_numbers: list[int]) -> None:
@@ -220,6 +220,13 @@ def _infer_avg_num_neighbors(mace_model: ScaleShiftMACE) -> float:
     return float(mace_model.interactions[0].avg_num_neighbors)
 
 
+def _infer_keep_last_layer_irreps(mace_model: ScaleShiftMACE) -> bool:
+    """Infer the constructor flag from the final product's actual output."""
+    hidden_irreps = mace_model.interactions[0].hidden_irreps
+    final_irreps = mace_model.products[-1].linear.irreps_out
+    return str(final_irreps) == str(hidden_irreps)
+
+
 def _validate_checkpoint_scope(mace_model: ScaleShiftMACE) -> None:
     atomic_numbers = mace_model.atomic_numbers.tolist()
     _validate_atomic_numbers(atomic_numbers)
@@ -264,6 +271,7 @@ def _infer_deepmd_config(mace_model: ScaleShiftMACE) -> _InferredMaceConfig:
         "radial_MLP": _infer_radial_mlp(mace_model),
         "std": _infer_scale(mace_model),
         "avg_num_neighbors": _infer_avg_num_neighbors(mace_model),
+        "keep_last_layer_irreps": _infer_keep_last_layer_irreps(mace_model),
     }
 
 
@@ -278,32 +286,19 @@ def _load_mace_checkpoint(model_path: Path, device: str) -> ScaleShiftMACE:
     callers should only use trusted checkpoint files, whether downloaded from the
     official download helper or supplied via a trusted local path.
     """
-    scale_shift_mace_cls = _load_mace_modules()[0]
-    model = torch.load(str(model_path), map_location=device, weights_only=False)
-    if not isinstance(model, scale_shift_mace_cls):
-        msg = (
-            "Loaded checkpoint is not a ScaleShiftMACE model: "
-            f"{model.__class__.__module__}.{model.__class__.__name__}"
-        )
-        raise TypeError(msg)
-    return model
+    from deepmd_gnn.mace_checkpoint import (  # noqa: PLC0415
+        load_native_mace_checkpoint,
+    )
+
+    return load_native_mace_checkpoint(model_path, device=device)
 
 
 def _validate_load_result(load_result: object) -> None:
-    missing_keys = list(getattr(load_result, "missing_keys", []))
-    unexpected_keys = list(getattr(load_result, "unexpected_keys", []))
+    from deepmd_gnn.mace_checkpoint import (  # noqa: PLC0415
+        validate_mace_state_dict_load,
+    )
 
-    disallowed_missing_keys = [
-        key
-        for key in missing_keys
-        if not key.endswith(_ALLOWED_MISSING_STATE_DICT_SUFFIXES)
-    ]
-    if disallowed_missing_keys or unexpected_keys:
-        msg = (
-            "Failed to load MACE checkpoint into DeePMD-GNN wrapper. "
-            f"missing={disallowed_missing_keys}, unexpected={unexpected_keys}"
-        )
-        raise RuntimeError(msg)
+    validate_mace_state_dict_load(load_result)
 
 
 def load_mace_off_model(
