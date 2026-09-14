@@ -48,7 +48,7 @@ nequip = "deepmd_gnn.pt:load"
 mace = "deepmd_gnn.pt_expt:load"
 
 [project.urls]
-repository = "https://github.com/deepmodeling/deepmd-gnn"
+repository = "https://gitlab.com/RutgersLBSR/deepmd-gnn"
 
 [project.optional-dependencies]
 cueq = [
