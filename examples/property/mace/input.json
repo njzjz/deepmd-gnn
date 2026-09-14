@@ -1,0 +1,44 @@
+{
+  "model": {
+    "type": "standard",
+    "type_map": [
+      "H",
+      "O"
+    ],
+    "descriptor": {
+      "type": "mace",
+      "model_path": "./trusted_single_head_mace_mp_or_mpa.model",
+      "sel": 64,
+      "trainable": true
+    },
+    "fitting_net": {
+      "type": "property",
+      "property_name": "band_gap",
+      "task_dim": 1,
+      "neuron": [
+        128,
+        128
+      ]
+    }
+  },
+  "learning_rate": {
+    "type": "exp",
+    "decay_steps": 5000,
+    "start_lr": 0.0001,
+    "stop_lr": 1e-08
+  },
+  "loss": {
+    "type": "property"
+  },
+  "training": {
+    "training_data": {
+      "systems": [
+        "../../data/property"
+      ],
+      "batch_size": 1
+    },
+    "numb_steps": 100000,
+    "disp_freq": 100,
+    "save_freq": 1000
+  }
+}
