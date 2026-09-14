@@ -293,7 +293,9 @@ def read_unrelocated_data(input_name, syms, secs):
                     f"failed to locate section for interval [{s['Value']:x}, {s['Value'] + s['Size']:x})"
                 )
             sec = sec[0]
-            f.seek(sec["Off"])
+            # ELF symbol values are virtual addresses, so translate the
+            # symbol's section-relative address back to its file offset.
+            f.seek(sec["Off"] + (s["Value"] - sec["Address"]))
             data[name] = f.read(s["Size"])
     return data
 
@@ -309,9 +311,7 @@ def collect_relocated_data(syms, bites, rels, ptr_size, reloc_types):
             continue
         data[name] = []
         for i in range(0, len(b), ptr_size):
-            val = int.from_bytes(
-                b[i * ptr_size : (i + 1) * ptr_size], byteorder="little"
-            )
+            val = int.from_bytes(b[i : i + ptr_size], byteorder="little")
             data[name].append(("offset", val))
         start = s["Value"]
         finish = start + s["Size"]
