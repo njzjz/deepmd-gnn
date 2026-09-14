@@ -14,6 +14,7 @@ import torch
 from deepmd.pt.utils.nlist import extend_input_and_build_neighbor_list
 
 from deepmd_gnn.mace import MaceModel
+from deepmd_gnn.mace_network import make_mace_network
 from deepmd_gnn.mace_off import (
     _infer_deepmd_config,
     _load_mace_checkpoint,
@@ -400,6 +401,65 @@ def test_load_mace_off_model_rejects_non_positive_sel() -> None:
     """Sel is a required positive runtime neighbor cap."""
     with pytest.raises(ValueError, match="sel must be positive"):
         load_mace_off_model(model_name=None, model_path=Path("dummy.model"), sel=0)
+
+
+def _make_off_policy_model(
+    *,
+    interaction_first: str = "RealAgnosticInteractionBlock",
+    pair_repulsion: bool = False,
+) -> torch.nn.Module:
+    old_dtype = torch.get_default_dtype()
+    torch.set_default_dtype(torch.float64)
+    try:
+        return make_mace_network(
+            r_max=3.0,
+            num_radial_basis=4,
+            num_cutoff_basis=5,
+            max_ell=1,
+            interaction_first=interaction_first,
+            interaction="RealAgnosticResidualInteractionBlock",
+            num_interactions=2,
+            num_elements=2,
+            hidden_irreps="2x0e",
+            atomic_numbers=[1, 8],
+            avg_num_neighbors=4.0,
+            pair_repulsion=pair_repulsion,
+            distance_transform="None",
+            correlation=2,
+            gate="silu",
+            MLP_irreps="4x0e",
+            std=1.0,
+            radial_MLP=[8, 8],
+            radial_type="bessel",
+            enable_cueq=False,
+            script_model=False,
+        )
+    finally:
+        torch.set_default_dtype(old_dtype)
+
+
+def test_off_policy_rejects_named_lowercase_head() -> None:
+    """Descriptor-compatible head names must not relax OFF conversion."""
+    model = _make_off_policy_model()
+    model.heads = ["default"]
+    with pytest.raises(ValueError, match="Multi-head checkpoints"):
+        _infer_deepmd_config(model)
+
+
+def test_off_policy_rejects_pair_repulsion() -> None:
+    """Descriptor-only pair-repulsion support must remain outside OFF."""
+    model = _make_off_policy_model(pair_repulsion=True)
+    with pytest.raises(ValueError, match="Pair-repulsion checkpoints"):
+        _infer_deepmd_config(model)
+
+
+def test_off_policy_rejects_residual_first_interaction() -> None:
+    """MPA-style residual first blocks must remain outside OFF conversion."""
+    model = _make_off_policy_model(
+        interaction_first="RealAgnosticResidualInteractionBlock",
+    )
+    with pytest.raises(ValueError, match="first interaction block"):
+        _infer_deepmd_config(model)
 
 
 @pytest.mark.slow
