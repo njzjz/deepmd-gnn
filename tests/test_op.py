@@ -165,6 +165,22 @@ def test_cuda_matches_cpu() -> None:
     torch.testing.assert_close(legacy_edge_index.cpu(), expected_edge_index)
 
 
+@pytest.mark.skipif(
+    torch.cuda.device_count() < 2,
+    reason="multiple CUDA devices are unavailable",
+)
+def test_cuda_preserves_current_device() -> None:
+    """A call on another GPU must restore the thread's active CUDA device."""
+    nlist = torch.tensor([[1], [0]], dtype=torch.int64, device="cuda:1")
+    atype = torch.tensor([0, 0], dtype=torch.int64, device="cuda:1")
+    mm_types = torch.empty((0,), dtype=torch.int64, device="cuda:1")
+    torch.cuda.set_device(0)
+
+    torch.ops.deepmd_gnn.edge_index(nlist, atype, mm_types)
+
+    assert torch.cuda.current_device() == 0
+
+
 def test_fake_dense_edge_index_handles_2d_nlist() -> None:
     """Fake dense edge op should preserve the flattened 2D nlist size."""
     nlist = torch.empty((3, 4), dtype=torch.int64)

@@ -81,6 +81,12 @@ pip install .
 
 Only PyTorch 2.10 or above is supported.
 
+The stable-ABI CUDA edge-index operation preserves the caller's active CUDA
+device. It launches on CUDA's legacy default stream because the extension does
+not link against PyTorch's CUDA runtime; callers using a non-default
+`torch.cuda.Stream` must synchronize that stream with the default stream around
+direct `torch.ops.deepmd_gnn.edge_index` calls.
+
 #### C++ interface plugin
 
 DeePMD-kit version should be v3.0.0b4 or later.

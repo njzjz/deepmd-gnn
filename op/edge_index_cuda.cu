@@ -38,6 +38,29 @@ struct DeviceBuffer {
   }
 };
 
+struct CudaDeviceGuard {
+  int previous_device = -1;
+  bool changed_device = false;
+
+  explicit CudaDeviceGuard(int requested_device) {
+    check_cuda(cudaGetDevice(&previous_device), "cudaGetDevice");
+    if (requested_device >= 0 && requested_device != previous_device) {
+      check_cuda(cudaSetDevice(requested_device), "cudaSetDevice");
+      changed_device = true;
+    }
+  }
+
+  CudaDeviceGuard(const CudaDeviceGuard&) = delete;
+  CudaDeviceGuard& operator=(const CudaDeviceGuard&) = delete;
+
+  ~CudaDeviceGuard() {
+    if (changed_device) {
+      // Destructors cannot report CUDA errors safely during stack unwinding.
+      cudaSetDevice(previous_device);
+    }
+  }
+};
+
 __device__ bool keep_edge(const int64_t* __restrict__ nlist,
                           const int64_t* __restrict__ atype,
                           const int64_t* __restrict__ mm,
@@ -129,9 +152,11 @@ int64_t edge_index_cuda(const int64_t* nlist,
                         int64_t nall,
                         int64_t nmm,
                         int device_index) {
-  if (device_index >= 0) {
-    check_cuda(cudaSetDevice(device_index), "cudaSetDevice");
-  }
+  const CudaDeviceGuard device_guard(device_index);
+  // The stable-ABI extension deliberately avoids linking PyTorch CUDA symbols,
+  // so it cannot query c10's current stream. Keep the legacy default stream
+  // explicit here and document the synchronization contract for callers.
+  cudaStream_t stream = nullptr;
 
   const int64_t total_slots = nf * nloc * nnei;
   if (total_slots == 0) {
@@ -144,24 +169,26 @@ int64_t edge_index_cuda(const int64_t* nlist,
   constexpr int threads = 256;
   const auto blocks =
       static_cast<unsigned int>((total_slots + threads - 1) / threads);
-  mark_edges_kernel<<<blocks, threads>>>(nlist, atype, mm, flags.ptr,
-                                         total_slots, nloc, nnei, nall, nmm);
+  mark_edges_kernel<<<blocks, threads, 0, stream>>>(
+      nlist, atype, mm, flags.ptr, total_slots, nloc, nnei, nall, nmm);
   check_cuda(cudaGetLastError(), "mark_edges_kernel launch");
 
-  thrust::inclusive_scan(thrust::device, thrust::device_pointer_cast(flags.ptr),
+  thrust::inclusive_scan(thrust::cuda::par.on(stream),
+                         thrust::device_pointer_cast(flags.ptr),
                          thrust::device_pointer_cast(flags.ptr + total_slots),
                          thrust::device_pointer_cast(prefix.ptr));
   check_cuda(cudaGetLastError(), "thrust::inclusive_scan");
 
   int64_t edge_count = 0;
-  check_cuda(cudaMemcpy(&edge_count, prefix.ptr + total_slots - 1,
-                        sizeof(int64_t), cudaMemcpyDeviceToHost),
-             "cudaMemcpy edge_count");
+  check_cuda(cudaMemcpyAsync(&edge_count, prefix.ptr + total_slots - 1,
+                             sizeof(int64_t), cudaMemcpyDeviceToHost, stream),
+             "cudaMemcpyAsync edge_count");
+  check_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize edge_count");
 
   if (edge_count > 0) {
-    scatter_edges_kernel<<<blocks, threads>>>(nlist, flags.ptr, prefix.ptr,
-                                              edge_index, total_slots, nloc,
-                                              nnei, nall);
+    scatter_edges_kernel<<<blocks, threads, 0, stream>>>(
+        nlist, flags.ptr, prefix.ptr, edge_index, total_slots, nloc, nnei,
+        nall);
     check_cuda(cudaGetLastError(), "scatter_edges_kernel launch");
   }
   return edge_count;
