@@ -221,6 +221,9 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         self.dim_out = feature_irreps.dim
         if payload is not None:
             self._load_backbone_variables(payload["@variables"])
+        # Match NequipModel: construct on CPU, then move so DeePMD fittings on
+        # env.DEVICE do not mix with a CPU e3nn GraphModel.
+        self.model = self.model.to(env.DEVICE)
         for parameter in self.parameters():
             parameter.requires_grad_(trainable)
         self.trainable = trainable
@@ -233,7 +236,7 @@ class NequipDescriptor(BaseDescriptor, torch.nn.Module):
         A copy preserves the caller's trainable modules and parameter identity.
         """
         descriptor = deepcopy(self)
-        descriptor.model = script(descriptor.model)
+        descriptor.model = script(descriptor.model.to(env.DEVICE))
         return descriptor
 
     def has_default_chg_spin(self) -> bool:

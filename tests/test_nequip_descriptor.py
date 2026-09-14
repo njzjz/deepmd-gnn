@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 import torch
 from deepmd.pt.model.model import get_model
+from deepmd.pt.utils import env
 from deepmd.pt.utils.nlist import extend_input_and_build_neighbor_list
 from nequip.data import AtomicDataDict
 
@@ -58,9 +59,14 @@ def descriptor(artifact: Path) -> NequipDescriptor:
 def _inputs() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     coord = torch.tensor(
         [[[0.0, 0.0, 0.0], [1.1, 0.2, 0.0], [0.3, 1.2, 0.4]]],
+        device=env.DEVICE,
     )
-    atype = torch.tensor([[0, 1, 1]], dtype=torch.int64)
-    nlist = torch.tensor([[[1, 2], [0, 2], [0, 1]]], dtype=torch.int64)
+    atype = torch.tensor([[0, 1, 1]], dtype=torch.int64, device=env.DEVICE)
+    nlist = torch.tensor(
+        [[[1, 2], [0, 2], [0, 1]]],
+        dtype=torch.int64,
+        device=env.DEVICE,
+    )
     return coord, atype, nlist
 
 
@@ -157,7 +163,7 @@ def test_features_match_original_graph(
     coord, atype, nlist = _inputs()
     actual = descriptor(coord, atype, nlist)[0]
 
-    original = _make_nequip_network(descriptor.params, 2)
+    original = _make_nequip_network(descriptor.params, 2).to(env.DEVICE)
     original.load_state_dict(
         {
             **descriptor.model.state_dict(),
@@ -178,8 +184,8 @@ def test_features_match_original_graph(
         AtomicDataDict.POSITIONS_KEY: coord.reshape(-1, 3).to(torch.float32),
         AtomicDataDict.EDGE_INDEX_KEY: edge_index,
         AtomicDataDict.ATOM_TYPE_KEY: atype.reshape(-1),
-        "batch": torch.zeros(3, dtype=torch.int64),
-        "ptr": torch.tensor([0, 3], dtype=torch.int64),
+        "batch": torch.zeros(3, dtype=torch.int64, device=env.DEVICE),
+        "ptr": torch.tensor([0, 3], dtype=torch.int64, device=env.DEVICE),
     }
     for name, module in original.model._modules.items():  # noqa: SLF001
         data = module(data)
@@ -196,6 +202,7 @@ def test_shape_rotation_invariance_and_mapping(
     features = descriptor(coord, atype, nlist)[0]
     rotation = torch.tensor(
         [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+        device=env.DEVICE,
     )
     rotated = descriptor(coord @ rotation.T, atype, nlist)[0]
     assert features.shape == (1, 3, 3)
@@ -203,7 +210,7 @@ def test_shape_rotation_invariance_and_mapping(
 
     extended_coord = torch.cat((coord, coord[:, 1:2]), 1)
     extended_atype = torch.cat((atype, atype[:, 1:2]), 1)
-    mapping = torch.tensor([[0, 1, 2, 1]], dtype=torch.int64)
+    mapping = torch.tensor([[0, 1, 2, 1]], dtype=torch.int64, device=env.DEVICE)
     mapped_nlist = nlist.clone()
     mapped_nlist[0, 0, 0] = 3
     mapped = descriptor(
@@ -214,16 +221,24 @@ def test_shape_rotation_invariance_and_mapping(
     )[0]
     torch.testing.assert_close(features, mapped, atol=2e-6, rtol=2e-6)
 
-    box = torch.eye(3, dtype=torch.float64).reshape(1, 9) * 6.0
+    box = torch.eye(3, dtype=torch.float64, device=env.DEVICE).reshape(1, 9) * 6.0
     periodic_features = []
     for periodic_coord in (
-        torch.tensor([[[0.1, 0, 0], [5.9, 0, 0]]], dtype=torch.float64),
-        torch.tensor([[[0.1, 0, 0], [-0.1, 0, 0]]], dtype=torch.float64),
+        torch.tensor(
+            [[[0.1, 0, 0], [5.9, 0, 0]]],
+            dtype=torch.float64,
+            device=env.DEVICE,
+        ),
+        torch.tensor(
+            [[[0.1, 0, 0], [-0.1, 0, 0]]],
+            dtype=torch.float64,
+            device=env.DEVICE,
+        ),
     ):
         coord_ext, atype_ext, pbc_mapping, pbc_nlist = (
             extend_input_and_build_neighbor_list(
                 periodic_coord,
-                torch.tensor([[0, 1]]),
+                torch.tensor([[0, 1]], device=env.DEVICE),
                 descriptor.get_rcut(),
                 descriptor.get_sel(),
                 mixed_types=True,
