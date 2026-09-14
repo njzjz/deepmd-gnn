@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.15)
+# FindCUDAToolkit and execute_process(COMMAND_ERROR_IS_FATAL), used by the
+# CUDA/dynamic-cudart build, require CMake 3.19 or newer.
+cmake_minimum_required(VERSION 3.19)
 project(deepmd-gnn CXX)
 
 set(CMAKE_CXX_STANDARD 14)
