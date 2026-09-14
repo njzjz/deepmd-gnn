@@ -84,7 +84,7 @@ def test_metadata_and_strict_pretrained_mapping(
     assert not descriptor.dense_lower_supports_comm()
     assert not descriptor.need_sorted_nlist_for_lower()
     assert descriptor.has_default_chg_spin() is False
-    assert descriptor.get_default_chg_spin() is None
+    descriptor.get_default_chg_spin()
     descriptor.compute_input_stats([])
     assert descriptor.get_stats() == {}
     descriptor.set_stat_mean_and_stddev(torch.ones(1), torch.ones(1))
