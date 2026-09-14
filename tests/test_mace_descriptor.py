@@ -206,8 +206,10 @@ def test_descriptor_supports_first_import_in_fresh_process() -> None:
         [
             sys.executable,
             "-c",
-            "from deepmd_gnn.mace_descriptor import MaceDescriptor; "
-            "assert MaceDescriptor.__name__ == 'MaceDescriptor'",
+            (
+                "from deepmd_gnn.mace_descriptor import MaceDescriptor; "
+                "assert MaceDescriptor.__name__ == 'MaceDescriptor'"
+            ),
         ],
         check=True,
         capture_output=True,
