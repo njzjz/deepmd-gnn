@@ -210,8 +210,10 @@ def test_descriptor_supports_first_import_in_fresh_process() -> None:
         [
             sys.executable,
             "-c",
-            "from deepmd_gnn.sevennet_descriptor import SevenNetDescriptor; "
-            "assert SevenNetDescriptor.__name__ == 'SevenNetDescriptor'",
+            (
+                "from deepmd_gnn.sevennet_descriptor import SevenNetDescriptor; "
+                "assert SevenNetDescriptor.__name__ == 'SevenNetDescriptor'"
+            ),
         ],
         check=True,
         capture_output=True,

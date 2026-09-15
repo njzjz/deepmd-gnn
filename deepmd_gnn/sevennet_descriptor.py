@@ -71,6 +71,7 @@ class SevenNetDescriptor(BaseDescriptor, torch.nn.Module):
         self.type_map = list(type_map)
         self.ntypes = len(self.type_map)
         self.trainable = bool(trainable)
+        self.model_path: str | None = None
         resolved = (
             None if model_path is None else resolve_sevennet_checkpoint_path(model_path)
         )
