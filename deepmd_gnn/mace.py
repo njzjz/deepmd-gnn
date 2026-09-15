@@ -8,42 +8,59 @@ from copy import deepcopy
 from typing import Any, Optional, cast
 
 import torch
-from deepmd.dpmodel.output_def import (
-    FittingOutputDef,
-    ModelOutputDef,
-    OutputVariableDef,
-)
-from deepmd.pt.model.model.model import (
-    BaseModel,
-)
-from deepmd.pt.model.model.transform_output import (
-    communicate_extended_output,
-)
-from deepmd.pt.utils.nlist import (
-    extend_input_and_build_neighbor_list,
-)
-from deepmd.pt.utils.stat import (
-    compute_output_stats,
-)
-from deepmd.pt.utils.update_sel import (
-    UpdateSel,
-)
-from deepmd.pt.utils.utils import (
-    to_numpy_array,
-    to_torch_tensor,
-)
-from deepmd.utils.data_system import (
-    DeepmdDataSystem,
-)
-from deepmd.utils.path import (
-    DPPath,
-)
-from deepmd.utils.version import (
-    check_version_compatibility,
-)
 from torch.fx.experimental.proxy_tensor import (
     make_fx,
 )
+
+from deepmd_gnn.torch_load_compat import trusted_e3nn_constants
+
+with trusted_e3nn_constants():
+    from deepmd.dpmodel.output_def import (
+        FittingOutputDef,
+        ModelOutputDef,
+        OutputVariableDef,
+    )
+    from deepmd.pt.model.model.model import (
+        BaseModel,
+    )
+    from deepmd.pt.model.model.transform_output import (
+        communicate_extended_output,
+    )
+    from deepmd.pt.utils.nlist import (
+        extend_input_and_build_neighbor_list,
+    )
+    from deepmd.pt.utils.stat import (
+        compute_output_stats,
+    )
+    from deepmd.pt.utils.update_sel import (
+        UpdateSel,
+    )
+    from deepmd.pt.utils.utils import (
+        to_numpy_array,
+        to_torch_tensor,
+    )
+    from deepmd.utils.data_system import (
+        DeepmdDataSystem,
+    )
+    from deepmd.utils.path import (
+        DPPath,
+    )
+    from deepmd.utils.version import (
+        check_version_compatibility,
+    )
+
+    from deepmd_gnn.mace_network import (
+        disable_cueq_in_model_params as _disable_cueq_in_model_params,
+    )
+    from deepmd_gnn.mace_network import (
+        link_module_state as _link_module_state,
+    )
+    from deepmd_gnn.mace_network import (
+        make_mace_network as _make_mace_network,
+    )
+    from deepmd_gnn.mace_network import (
+        transfer_cueq_to_e3nn as _transfer_cueq_to_e3nn,
+    )
 
 import deepmd_gnn.op  # noqa: F401
 from deepmd_gnn.autograd import derive_atomic_virial_from_displacement
@@ -54,18 +71,6 @@ from deepmd_gnn.export import (
 )
 from deepmd_gnn.export import (
     pad_nlist_for_export as _pad_nlist_for_export,
-)
-from deepmd_gnn.mace_network import (
-    disable_cueq_in_model_params as _disable_cueq_in_model_params,
-)
-from deepmd_gnn.mace_network import (
-    link_module_state as _link_module_state,
-)
-from deepmd_gnn.mace_network import (
-    make_mace_network as _make_mace_network,
-)
-from deepmd_gnn.mace_network import (
-    transfer_cueq_to_e3nn as _transfer_cueq_to_e3nn,
 )
 from deepmd_gnn.stat_compat import load_observed_type_stat_compat
 

@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, TypedDict
 import torch
 
 from deepmd_gnn.mace_off_cli import download_mace_off_model
+from deepmd_gnn.torch_load_compat import trusted_e3nn_constants
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -63,7 +64,7 @@ class _InferredMaceConfig(TypedDict):
 def _load_mace_modules() -> tuple[type[ScaleShiftMACE], dict[str, object]]:
     # mace prints optional cuequivariance availability to stdout at import time.
     # Keep library import chatter out of CLI stdout while preserving real errors.
-    with redirect_stdout(io.StringIO()):
+    with redirect_stdout(io.StringIO()), trusted_e3nn_constants():
         mace_modules = importlib.import_module("mace.modules")
     return mace_modules.ScaleShiftMACE, mace_modules.gate_dict
 
@@ -72,7 +73,7 @@ def _load_mace_modules() -> tuple[type[ScaleShiftMACE], dict[str, object]]:
 def _load_deepmd_mace_symbols() -> tuple[list[str], type[MaceModel]]:
     # Import deepmd first so its entry-point loader registers DeePMD-GNN models
     # without causing a circular import through deepmd_gnn.mace.
-    with redirect_stdout(io.StringIO()):
+    with redirect_stdout(io.StringIO()), trusted_e3nn_constants():
         importlib.import_module("deepmd.pt.model")
         mace_module = importlib.import_module("deepmd_gnn.mace")
     return mace_module.ELEMENTS, mace_module.MaceModel
@@ -80,7 +81,7 @@ def _load_deepmd_mace_symbols() -> tuple[list[str], type[MaceModel]]:
 
 @lru_cache(maxsize=1)
 def _load_e3nn_script() -> Callable[[torch.nn.Module], torch.nn.Module]:
-    with redirect_stdout(io.StringIO()):
+    with redirect_stdout(io.StringIO()), trusted_e3nn_constants():
         e3nn_jit = importlib.import_module("e3nn.util.jit")
     return e3nn_jit.script
 

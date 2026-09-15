@@ -4,56 +4,60 @@ from copy import deepcopy
 from typing import Any
 
 import torch
-from deepmd.dpmodel.output_def import (
-    FittingOutputDef,
-    ModelOutputDef,
-    OutputVariableDef,
-)
-from deepmd.pt.model.model.model import (
-    BaseModel,
-)
-from deepmd.pt.model.model.transform_output import (
-    communicate_extended_output,
-)
-from deepmd.pt.utils import (
-    env,
-)
-from deepmd.pt.utils.nlist import (
-    extend_input_and_build_neighbor_list,
-)
-from deepmd.pt.utils.stat import (
-    compute_output_stats,
-)
-from deepmd.pt.utils.update_sel import (
-    UpdateSel,
-)
-from deepmd.pt.utils.utils import (
-    to_numpy_array,
-    to_torch_tensor,
-)
-from deepmd.utils.data_system import (
-    DeepmdDataSystem,
-)
-from deepmd.utils.path import (
-    DPPath,
-)
-from deepmd.utils.version import (
-    check_version_compatibility,
-)
-from e3nn.util.jit import (
-    script,
-)
-from nequip.data import (
-    AtomicDataDict,
-)
-from nequip.model import model_from_config
-from nequip.nn import (
-    GraphModel,
-    GraphModuleMixin,
-)
 from torch.fx.experimental.proxy_tensor import (
     make_fx,
 )
+
+from deepmd_gnn.torch_load_compat import trusted_e3nn_constants
+
+with trusted_e3nn_constants():
+    from deepmd.dpmodel.output_def import (
+        FittingOutputDef,
+        ModelOutputDef,
+        OutputVariableDef,
+    )
+    from deepmd.pt.model.model.model import (
+        BaseModel,
+    )
+    from deepmd.pt.model.model.transform_output import (
+        communicate_extended_output,
+    )
+    from deepmd.pt.utils import (
+        env,
+    )
+    from deepmd.pt.utils.nlist import (
+        extend_input_and_build_neighbor_list,
+    )
+    from deepmd.pt.utils.stat import (
+        compute_output_stats,
+    )
+    from deepmd.pt.utils.update_sel import (
+        UpdateSel,
+    )
+    from deepmd.pt.utils.utils import (
+        to_numpy_array,
+        to_torch_tensor,
+    )
+    from deepmd.utils.data_system import (
+        DeepmdDataSystem,
+    )
+    from deepmd.utils.path import (
+        DPPath,
+    )
+    from deepmd.utils.version import (
+        check_version_compatibility,
+    )
+    from e3nn.util.jit import (
+        script,
+    )
+    from nequip.data import (
+        AtomicDataDict,
+    )
+    from nequip.model import model_from_config
+    from nequip.nn import (
+        GraphModel,
+        GraphModuleMixin,
+    )
 
 import deepmd_gnn.op  # noqa: F401
 from deepmd_gnn.autograd import derive_atomic_virial_from_displacement

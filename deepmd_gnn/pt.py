@@ -3,6 +3,8 @@
 import contextlib
 import sys
 
+from deepmd_gnn.torch_load_compat import trusted_e3nn_constants
+
 
 def load() -> None:
     """Entry point placeholder; importing this module registers plugins."""
@@ -39,4 +41,7 @@ def _register() -> None:
     PyTorchBaseModel.register("nequip")(NequipModel)
 
 
-_register()
+# DeePMD's model registry imports e3nn before it reaches our model wrappers.
+# Cover that entry-point import order as well as direct wrapper imports.
+with trusted_e3nn_constants():
+    _register()

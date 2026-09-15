@@ -2,6 +2,8 @@
 
 import sys
 
+from deepmd_gnn.torch_load_compat import trusted_e3nn_constants
+
 
 def load() -> None:
     """Entry point placeholder; importing this module registers plugins."""
@@ -92,4 +94,6 @@ def _register() -> None:
     ExportableBaseModel.register("mace")(MaceModel)
 
 
-_register()
+# Registry imports can load legacy e3nn constants before MaceModel is reached.
+with trusted_e3nn_constants():
+    _register()
