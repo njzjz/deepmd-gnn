@@ -66,6 +66,10 @@ cueq-cu12 = [
     "cuequivariance-torch>=0.10.0",
     "cuequivariance-ops-torch-cu12>=0.10.0",
 ]
+sevennet = [
+    "sevenn>=0.11",
+    "e3nn>=0.5",
+]
 test = [
     'pytest',
     'pytest-cov',

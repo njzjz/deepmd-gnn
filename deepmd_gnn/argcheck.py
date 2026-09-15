@@ -55,6 +55,56 @@ def mace_descriptor_args() -> Argument:
     )
 
 
+@descrpt_args_plugin.register("sevennet")
+def sevennet_descriptor_args() -> Argument:
+    """Arguments for a pretrained SevenNet property descriptor."""
+    return Argument(
+        "sevennet",
+        dict,
+        [
+            Argument(
+                "sel",
+                int,
+                optional=False,
+                doc="Explicit mixed-type DeePMD neighbor-list capacity.",
+            ),
+            Argument(
+                "model_path",
+                str,
+                optional=True,
+                doc=(
+                    "Path to a trusted native SevenNet checkpoint, or a "
+                    "single-task pretrained keyword such as 7net-0. Required "
+                    "for initialization; saved DeePMD checkpoints restore from "
+                    "the persisted config."
+                ),
+            ),
+            Argument(
+                "config",
+                dict,
+                optional=True,
+                doc=(
+                    "Inferred SevenNet backbone architecture persisted into the "
+                    "saved model definition so restoration does not reopen "
+                    "the native checkpoint."
+                ),
+            ),
+            Argument(
+                "trainable",
+                bool,
+                optional=True,
+                default=True,
+                doc="Whether to optimize the pretrained SevenNet backbone.",
+            ),
+        ],
+        doc=(
+            "PT-only invariant descriptor from last-layer SevenNet 0e "
+            "node features. Single-task checkpoints only; no Omni/MF, "
+            "cuEquivariance, FlashTP, or LAMMPS MLIAP."
+        ),
+    )
+
+
 @model_args_plugin.register("mace")
 def mace_model_args() -> Argument:
     """Arguments for the MACE model.
