@@ -9,6 +9,7 @@ import nox
 nox.options.sessions = ["tests"]
 
 UV_OVERRIDES = "requirements-overrides.txt"
+SEVENNET_OVERRIDES = "requirements-sevennet-overrides.txt"
 UV_TORCH_BACKEND = os.environ.get("UV_TORCH_BACKEND", "cpu")
 
 
@@ -36,6 +37,33 @@ def tests(session: nox.Session) -> None:
     install(session, "deepmd-kit[torch]>=3.2.0b0")
     session.run(
         "pytest",
+        "--cov",
+        "--cov-config",
+        "pyproject.toml",
+        "--cov-report",
+        "term",
+        "--cov-report",
+        "xml",
+    )
+
+
+@nox.session
+def sevennet(session: nox.Session) -> None:
+    """Run SevenNet descriptor tests with e3nn>=0.5."""
+    session.install(
+        "numpy",
+        "deepmd-kit[torch]>=3.2.0b0",
+        "-e.[test,sevennet]",
+        "--overrides",
+        SEVENNET_OVERRIDES,
+        "--torch-backend",
+        UV_TORCH_BACKEND,
+    )
+    session.run(
+        "pytest",
+        "tests/test_sevennet_descriptor.py",
+        "-m",
+        "not slow",
         "--cov",
         "--cov-config",
         "pyproject.toml",

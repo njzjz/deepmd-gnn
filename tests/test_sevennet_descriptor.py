@@ -33,10 +33,16 @@ from sevenn.util import chemical_species_preprocess, load_checkpoint
 
 from deepmd_gnn.sevennet_checkpoint import (
     ENERGY_MODULE_NAMES,
+    _dtype_from_name,
+    _infer_state_dtype,
+    json_safe_value,
+    last_feature_irreps,
     load_sevennet_checkpoint_config,
     persistable_checkpoint_config,
     reject_unsupported_sevennet,
+    restore_sevenn_config,
     scalar_even_indices,
+    validate_sevennet_state_dict_load,
 )
 from deepmd_gnn.sevennet_descriptor import SevenNetDescriptor
 
@@ -159,11 +165,21 @@ def test_constructor_registry_and_metadata(sevennet_checkpoint: Path) -> None:
     assert descriptor.get_nsel() == 16
     assert descriptor.get_rcut() == pytest.approx(3.0)
     assert descriptor.get_dim_out() == 4
+    assert descriptor.get_ntypes() == 2
+    assert descriptor.get_rcut_smth() == pytest.approx(3.0)
+    assert descriptor.get_dim_emb() == 4
+    assert descriptor.get_env_protection() == 0.0
     assert descriptor.mixed_types()
     assert descriptor.has_message_passing()
     assert not descriptor.has_message_passing_across_ranks()
+    assert not descriptor.supports_edge_parallel()
+    assert not descriptor.dense_lower_supports_comm()
+    assert not descriptor.need_sorted_nlist_for_lower()
+    assert descriptor.has_default_chg_spin() is False
+    descriptor.get_default_chg_spin()
+    descriptor.compute_input_stats([])
+    assert descriptor.get_stats() == {}
     assert all(parameter.requires_grad for parameter in descriptor.parameters())
-    assert descriptor.get_default_chg_spin() is None
     descriptor.set_stat_mean_and_stddev(torch.ones(1), torch.ones(1))
     mean, stddev = descriptor.get_stat_mean_and_stddev()
     assert mean.numel() == 0
@@ -227,6 +243,238 @@ def test_constructor_rejects_modal_checkpoint(tmp_path: Path) -> None:
             sel=16,
             type_map=["H", "O"],
         )
+
+
+def test_constructor_and_runtime_error_paths(
+    sevennet_checkpoint: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover constructor, update_sel, share, and forward rejection paths."""
+    with pytest.raises(ValueError, match="positive integer"):
+        SevenNetDescriptor(
+            model_path=sevennet_checkpoint,
+            sel=0,
+            type_map=["H", "O"],
+        )
+    with pytest.raises(ValueError, match="requires the model-level type_map"):
+        SevenNetDescriptor(model_path=sevennet_checkpoint, sel=16)
+    with pytest.raises(ValueError, match="ntypes="):
+        SevenNetDescriptor(
+            model_path=sevennet_checkpoint,
+            sel=16,
+            type_map=["H", "O"],
+            ntypes=3,
+        )
+    with pytest.raises(TypeError, match="Unsupported SevenNet descriptor arguments"):
+        SevenNetDescriptor(
+            model_path=sevennet_checkpoint,
+            sel=16,
+            type_map=["H", "O"],
+            unknown=True,
+        )
+    with pytest.raises(FileNotFoundError, match="not found"):
+        SevenNetDescriptor(
+            model_path=tmp_path / "missing.pth",
+            sel=16,
+            type_map=["H", "O"],
+        )
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_sevennet_checkpoint_config("not-a-real-sevennet-keyword")
+    with pytest.raises(ValueError, match="Exactly one of model_path"):
+        SevenNetDescriptor(sel=16, type_map=["H", "O"])
+    with pytest.raises(ValueError, match="Serialized SevenNet descriptor type_map"):
+        SevenNetDescriptor(
+            sel=16,
+            type_map=["O", "H"],
+            config=load_sevennet_checkpoint_config(sevennet_checkpoint),
+        )
+    frozen = SevenNetDescriptor(
+        model_path=sevennet_checkpoint,
+        sel=16,
+        type_map=["H", "O"],
+        trainable=False,
+    )
+    assert all(not parameter.requires_grad for parameter in frozen.parameters())
+    inferred_config: dict = {"stale": True}
+    SevenNetDescriptor(
+        model_path=sevennet_checkpoint,
+        sel=16,
+        type_map=["H", "O"],
+        config=inferred_config,
+    )
+    assert "stale" not in inferred_config
+    assert inferred_config["type_map"] == ["H", "O"]
+
+    monkeypatch.setattr(
+        "deepmd_gnn.sevennet_descriptor.last_feature_irreps",
+        lambda _model: Irreps("1x1o"),
+    )
+    with pytest.raises(ValueError, match="no 0e channels"):
+        SevenNetDescriptor(
+            model_path=sevennet_checkpoint,
+            sel=16,
+            type_map=["H", "O"],
+        )
+    monkeypatch.undo()
+
+    descriptor = SevenNetDescriptor(
+        model_path=sevennet_checkpoint,
+        sel=16,
+        type_map=["H", "O"],
+    )
+    shared = SevenNetDescriptor(
+        model_path=sevennet_checkpoint,
+        sel=16,
+        type_map=["H", "O"],
+    )
+    shared.share_params(descriptor, 0)
+    assert shared.backbone is descriptor.backbone
+    with pytest.raises(TypeError, match="can only share"):
+        shared.share_params(object(), 0)  # type: ignore[arg-type]
+    with pytest.raises(NotImplementedError, match="level 0"):
+        shared.share_params(descriptor, 1)
+    with pytest.raises(NotImplementedError, match="changing or subsetting type_map"):
+        descriptor.change_type_map(["H"])
+
+    coord_ext, atype_ext, nlist, mapping = _inputs(descriptor)
+    with pytest.raises(NotImplementedError, match="MPI communication"):
+        descriptor(
+            coord_ext,
+            atype_ext,
+            nlist,
+            mapping=mapping,
+            comm_dict={"send": torch.zeros(1)},
+        )
+    coord = torch.tensor(
+        [[[0.1, 0.2, 0.3], [3.8, 0.2, 0.3], [0.2, 3.7, 0.4]]],
+        dtype=torch.float64,
+    )
+    box = (torch.eye(3, dtype=torch.float64) * 4.0).reshape(1, 9)
+    coord_ext, atype_ext, nlist, mapping = _inputs(descriptor, coord, box)
+    assert atype_ext.shape[1] > nlist.shape[1]
+    with pytest.raises(ValueError, match="requires mapping"):
+        descriptor(coord_ext, atype_ext, nlist, mapping=None)
+
+    with pytest.raises(ValueError, match="serialized SevenNetDescriptor"):
+        SevenNetDescriptor.deserialize(
+            {
+                "@class": "Descriptor",
+                "type": "mace",
+                "@version": 1,
+            },
+        )
+    with pytest.raises(ValueError, match="explicit positive integer sel"):
+        SevenNetDescriptor.update_sel(None, ["H", "O"], {"sel": True})
+    updated, min_distance = SevenNetDescriptor.update_sel(
+        None,
+        None,
+        {"sel": 16, "model_path": str(sevennet_checkpoint)},
+    )
+    assert updated["config"]["type_map"] == ["H", "O"]
+    assert min_distance is None
+    unchanged, _ = SevenNetDescriptor.update_sel(None, ["H", "O"], {"sel": 16})
+    assert "config" not in unchanged
+    with pytest.raises(ValueError, match="exactly match checkpoint"):
+        SevenNetDescriptor.update_sel(
+            None,
+            ["O", "H"],
+            {
+                "sel": 16,
+                "model_path": str(sevennet_checkpoint),
+            },
+        )
+
+
+def test_checkpoint_helpers_cover_unsupported_and_json_paths(
+    tmp_path: Path,
+) -> None:
+    """Reject unsupported variants and keep persisted configs JSON-safe."""
+    reject_cases = (
+        ({"use_modality": True}, "Multi-fidelity"),
+        ({"_modal_map": {"pbe": 0}}, "modal map"),
+        ({"cuequivariance_config": {"use": True}}, "cuEquivariance"),
+        ({"use_flash_tp": True}, "FlashTP"),
+        ({"use_oeq": True}, "OpenEquivariance"),
+        ({"use_mliap": True}, "MLIAP"),
+    )
+    for config, match in reject_cases:
+        with pytest.raises(ValueError, match=match):
+            reject_unsupported_sevennet(config)
+
+    payload = json_safe_value(
+        {
+            1: torch.tensor([1.5]),
+            "arr": np.array([2, 3]),
+            "i": np.int64(4),
+            "f": np.float64(1.25),
+            "b": np.bool_(True),  # noqa: FBT003
+            "p": tmp_path / "x",
+            "t": (1, 2),
+        },
+    )
+    assert payload["1"] == [1.5]
+    assert payload["arr"] == [2, 3]
+    assert payload["i"] == 4
+    assert payload["f"] == pytest.approx(1.25)
+    assert payload["b"] is True
+    assert payload["p"].endswith("x")
+    assert payload["t"] == [1, 2]
+    json.dumps(payload)
+
+    restored = restore_sevenn_config({"_type_map": {"0": 1, "1": 8}})
+    assert restored["_type_map"] == {0: 1, 1: 8}
+
+    persistable = persistable_checkpoint_config(
+        {
+            "type_map": ["H"],
+            "source_dtype": "float16",
+            "sevenn_config": {
+                "cutoff": 3.0,
+                "num_convolution_layer": 2,
+                "chemical_species": ["H"],
+                "dtype": "float16",
+            },
+        },
+    )
+    assert persistable["source_dtype"] == "float32"
+    assert _dtype_from_name("float64") == torch.float64
+    assert _dtype_from_name("float32") == torch.float32
+    assert _infer_state_dtype({"n": torch.tensor(1)}) == torch.float32
+    assert (
+        _infer_state_dtype({"w": torch.zeros(1, dtype=torch.float64)}) == torch.float64
+    )
+
+    empty = torch.nn.Module()
+    with pytest.raises(ValueError, match="no equivariant_gate"):
+        last_feature_irreps(empty)
+
+    class _Gate(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gate = None
+
+    class _Backbone(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.layer_equivariant_gate = _Gate()
+
+    with pytest.raises(ValueError, match="does not expose"):
+        last_feature_irreps(_Backbone())
+
+    assert scalar_even_indices(Irreps("2x0e+1x1o+1x0o+1x0e")) == [0, 1, 6]
+
+    broken = tmp_path / "not_a_checkpoint.pth"
+    torch.save([1, 2, 3], broken)
+    with pytest.raises(TypeError, match="dictionary"):
+        load_sevennet_checkpoint_config(broken)
+
+    class _LoadResult:
+        missing_keys = ("weight",)
+        unexpected_keys = ()
+
+    with pytest.raises(RuntimeError, match="Failed to load"):
+        validate_sevennet_state_dict_load(_LoadResult())
 
 
 def test_forward_shape_rotation_invariance_and_gradient(

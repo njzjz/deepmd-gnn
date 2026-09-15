@@ -53,7 +53,10 @@ class SevenNetDescriptor(BaseDescriptor, torch.nn.Module):
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         super().__init__()
-        del kwargs
+        if kwargs:
+            unknown = ", ".join(sorted(kwargs))
+            msg = f"Unsupported SevenNet descriptor arguments: {unknown}"
+            raise TypeError(msg)
         if not isinstance(sel, int) or isinstance(sel, bool) or sel <= 0:
             msg = f"sel must be an explicit positive integer, got {sel!r}"
             raise ValueError(msg)
@@ -132,6 +135,10 @@ class SevenNetDescriptor(BaseDescriptor, torch.nn.Module):
         self.backbone = script_feature_backbone(self.backbone)
         for parameter in self.backbone.parameters():
             parameter.requires_grad_(self.trainable)
+
+    def has_default_chg_spin(self) -> bool:
+        """Declare absent charge/spin defaults for newer DeePMD model exports."""
+        return False
 
     def get_default_chg_spin(self) -> None:
         """Return no charge/spin defaults with a concrete TorchScript type."""
