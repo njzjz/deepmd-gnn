@@ -84,10 +84,15 @@ else()
     STATUS "CUDAToolkit/nvcc not found or CUDA disabled; building CPU-only OP")
 endif()
 
-if(BUILD_CPP_IF
-   AND USE_PT_PYTHON_LIBS
-   AND NOT CMAKE_CROSSCOMPILING
-   AND NOT SKBUILD
+# Python interface builds already require torch as a build dependency, so use
+# that interpreter to discover LibTorch. Appending preserves any caller-supplied
+# prefixes at the front of CMAKE_PREFIX_PATH.
+if(BUILD_PY_IF
+   OR (BUILD_CPP_IF
+       AND USE_PT_PYTHON_LIBS
+       AND NOT CMAKE_CROSSCOMPILING
+       AND NOT SKBUILD
+      )
    OR "$ENV{CIBUILDWHEEL}" STREQUAL "1")
   find_package(
     Python
@@ -104,7 +109,7 @@ if(BUILD_CPP_IF
   if(NOT ${PYTORCH_CMAKE_PREFIX_PATH_RESULT_VAR} EQUAL 0)
     message(
       FATAL_ERROR
-        "Cannot determine PyTorch CMake prefix path, error code: $PYTORCH_CMAKE_PREFIX_PATH_RESULT_VAR}, error message: ${PYTORCH_CMAKE_PREFIX_PATH_ERROR_VAR}"
+        "Cannot determine PyTorch CMake prefix path, error code: ${PYTORCH_CMAKE_PREFIX_PATH_RESULT_VAR}, error message: ${PYTORCH_CMAKE_PREFIX_PATH_ERROR_VAR}"
     )
   endif()
   list(APPEND CMAKE_PREFIX_PATH ${PYTORCH_CMAKE_PREFIX_PATH})
