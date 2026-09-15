@@ -5,11 +5,10 @@
       "H",
       "O"
     ],
-    "data_stat_nbatch": 1,
     "descriptor": {
       "type": "sevennet",
-      "model_path": "./tiny_sevennet.pth",
-      "sel": 16,
+      "model_path": "./trusted_single_task_sevennet.pth",
+      "sel": 64,
       "trainable": true
     },
     "fitting_net": {
@@ -17,18 +16,17 @@
       "property_name": "band_gap",
       "task_dim": 1,
       "neuron": [
-        32,
-        32
+        128,
+        128
       ],
-      "precision": "float32",
-      "seed": 1
+      "precision": "float32"
     }
   },
   "learning_rate": {
     "type": "exp",
-    "decay_steps": 10,
-    "start_lr": 0.001,
-    "stop_lr": 0.0001
+    "decay_steps": 5000,
+    "start_lr": 0.0001,
+    "stop_lr": 1e-08
   },
   "loss": {
     "type": "property",
@@ -37,14 +35,12 @@
   "training": {
     "training_data": {
       "systems": [
-        "./data"
+        "../../data/property"
       ],
-      "batch_size": 2
+      "batch_size": 1
     },
-    "numb_steps": 20,
-    "seed": 1,
-    "disp_freq": 1,
-    "save_freq": 10,
-    "save_ckpt": "model.ckpt"
+    "numb_steps": 100000,
+    "disp_freq": 100,
+    "save_freq": 1000
   }
 }
